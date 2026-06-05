@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   console.log('App starting...');
   _initConnectionUI();
   _initModeSelector();
+  _initRobotTabs();
   _initResizeHandle();
   _initMissionTime();
   initMapViewer();
@@ -52,18 +53,39 @@ function _initConnectionUI() {
 }
 
 function _initModeSelector() {
-  const modeBtns = document.querySelectorAll('.mode-btn');
+  const modeTabs = document.querySelectorAll('.mode-tab');
   const modePanels = document.querySelectorAll('.mode-panel');
 
-  modeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      modeBtns.forEach(b => b.classList.remove('active'));
+  modeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      modeTabs.forEach(t => t.classList.remove('active'));
       modePanels.forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      const mode = btn.dataset.mode;
+      tab.classList.add('active');
+      const mode = tab.dataset.mode;
       const panel = document.getElementById(`mode-${mode}`);
       if (panel) panel.classList.add('active');
       if (mode === 'partitioner') window.dispatchEvent(new Event('resize'));
+    });
+  });
+}
+
+function _initRobotTabs() {
+  const tabs = document.querySelectorAll('.robot-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const robot = tab.dataset.robot;
+      if (!robot) return;
+
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Update robot images
+      document.querySelectorAll('.robot-img-wrap').forEach(wrap => {
+        wrap.classList.toggle('hidden', wrap.id !== `robot-img-${robot}`);
+      });
+
+      // Notify teleop module via custom event
+      document.dispatchEvent(new CustomEvent('robot-tab-change', { detail: { robot } }));
     });
   });
 }

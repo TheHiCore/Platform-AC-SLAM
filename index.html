@@ -38,74 +38,107 @@
     <!-- Left Panel -->
     <div class="left-panel" id="left-panel">
 
-      <!-- Mode Selector -->
-      <div class="mode-selector">
-        <button class="mode-btn active" data-mode="teleop">Teleop</button>
-        <button class="mode-btn" data-mode="partitioner">Partitioner</button>
+      <!-- Mode Selector — thin sharp tabs like map thumbs -->
+      <div class="mode-tabs">
+        <button class="mode-tab active" data-mode="teleop">TELEOP</button>
+        <button class="mode-tab" data-mode="partitioner">PARTITIONER</button>
       </div>
 
       <!-- Mode Content -->
       <div class="mode-content">
 
-        <!-- Teleop Mode -->
+        <!-- ─── Teleop Mode ─── -->
         <div id="mode-teleop" class="mode-panel active">
+
+          <!-- Robot tabs at top (like map thumbnails) -->
+          <div class="robot-tabs">
+            <div class="robot-tab active" id="robot-tab-robot1" data-robot="robot1">
+              <div class="panel-header">Robot 1</div>
+            </div>
+            <div class="robot-tab" id="robot-tab-robot2" data-robot="robot2">
+              <div class="panel-header">Robot 2</div>
+            </div>
+          </div>
+
           <div class="teleop-ui">
-            <div class="teleop-header">
-              <span class="robot-label" id="teleop-robot-label">Robot 1</span>
-              <select id="teleop-robot" class="robot-select">
-                <option value="robot1">Robot 1</option>
-                <option value="robot2">Robot 2</option>
-              </select>
+
+            <!-- D-pad on top -->
+            <div class="dpad-section">
+              <div class="d-pad-8">
+                <button id="btn-nw" class="d-btn d-nw">u</button>
+                <button id="btn-n"  class="d-btn d-n" >i</button>
+                <button id="btn-ne" class="d-btn d-ne">o</button>
+                <button id="btn-w"  class="d-btn d-w" >j</button>
+                <button id="btn-stop" class="d-btn d-stop d-stop-grid">k</button>
+                <button id="btn-e"  class="d-btn d-e" >l</button>
+                <button id="btn-sw" class="d-btn d-sw">m</button>
+                <button id="btn-s"  class="d-btn d-s" >,</button>
+                <button id="btn-se" class="d-btn d-se">.</button>
+              </div>
             </div>
 
-            <div class="d-pad-8">
-              <button id="btn-nw" class="d-btn d-nw">u</button>
-              <button id="btn-n" class="d-btn d-n">i</button>
-              <button id="btn-ne" class="d-btn d-ne">o</button>
-              <button id="btn-w" class="d-btn d-w">j</button>
-              <button id="btn-stop" class="d-btn d-stop d-stop-grid">k</button>
-              <button id="btn-e" class="d-btn d-e">l</button>
-              <button id="btn-sw" class="d-btn d-sw">m</button>
-              <button id="btn-s" class="d-btn d-s">,</button>
-              <button id="btn-se" class="d-btn d-se">.</button>
-            </div>
-
+            <!-- Holonomic row -->
             <div class="holonomic-row">
               <span class="switch-label" id="holonomic-label">Non-Holonomic</span>
               <div class="switch-track" id="holonomic-switch">
                 <div class="switch-thumb"></div>
               </div>
-              <span class="switch-label active" id="holonomic-label-on" style="display:none;">Holonomic</span>
+              <span class="switch-label" id="holonomic-label-on" style="display:none;">Holonomic</span>
             </div>
 
-            <div class="speed-controls" style="color: var(--muted); font-size: 0.75rem; line-height: 1.4; margin-top: 10px;">
-              <div>q/z : increase/decrease max speeds by 10%</div>
-              <div>w/x : increase/decrease only linear speed by 10%</div>
-              <div>e/c : increase/decrease only angular speed by 10%</div>
-              <div style="margin-top: 10px; font-weight: bold; color: var(--text);">
-                Linear Speed: <span id="teleop-speed-val">0.50</span> | 
-                Angular Speed: <span id="teleop-angular-speed-val">1.00</span>
+            <!-- Speed hints -->
+            <div class="speed-hints">
+              <div>q/z &mdash; speeds &plusmn;10%</div>
+              <div>w/x &mdash; linear &plusmn;10%</div>
+              <div>e/c &mdash; angular &plusmn;10%</div>
+              <div class="speed-vals">
+                Lin: <span id="teleop-speed-val">0.50</span>
+                &nbsp;|&nbsp;
+                Ang: <span id="teleop-angular-speed-val">1.00</span>
               </div>
             </div>
 
+            <!-- Velocity readout -->
             <div class="teleop-stats">
               <div>vx: <span id="vel-lin-x">0.00</span></div>
               <div>vy: <span id="vel-lin-y">0.00</span></div>
               <div>&#969;: <span id="vel-ang-z">0.00</span></div>
             </div>
+
+            <!-- Robot image placeholders at bottom -->
+            <div class="robot-images">
+              <div class="robot-img-wrap" id="robot-img-robot1">
+                <div class="robot-img-placeholder">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--blue)" opacity="0.3"><path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m9 8v-2h-6V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v2H3v2h1l1 9h14l1-9h1z"/></svg>
+                  <span class="robot-img-label">Robot 1</span>
+                  <span class="robot-img-hint">Replace with robot photo</span>
+                </div>
+              </div>
+              <div class="robot-img-wrap hidden" id="robot-img-robot2">
+                <div class="robot-img-placeholder">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--orange)" opacity="0.3"><path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m9 8v-2h-6V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v2H3v2h1l1 9h14l1-9h1z"/></svg>
+                  <span class="robot-img-label">Robot 2</span>
+                  <span class="robot-img-hint">Replace with robot photo</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
-        <!-- Partitioner Mode -->
+        <!-- ─── Partitioner Mode ─── -->
         <div id="mode-partitioner" class="mode-panel">
           <div class="part-container">
-            <div class="part-top">
-              <div class="part-top-actions">
-                <button class="btn-icon" id="part-fs-yaml" title="Full screen YAML">&#9974;</button>
-                <button class="btn-icon" id="part-fs-graph" title="Full screen graph">&#9974;</button>
+
+            <!-- YAML section — map-panel style: header + divider + code -->
+            <div class="yaml-section">
+              <div class="yaml-section-header">
+                <span>GRAPH DEFINITION (YAML)</span>
+                <div class="yaml-header-actions">
+                  <button class="btn-thin" id="part-fs-yaml-inline" title="Enlarge">&#x26F6; Enlarge</button>
+                </div>
               </div>
-              <label>Graph Definition (YAML)</label>
-              <div class="yaml-editor-wrap">
+              <div class="yaml-code-area">
                 <pre class="yaml-highlight" id="yaml-highlight"></pre>
                 <textarea id="part-yaml" class="yaml-textarea" spellcheck="false">nodes:
   - id: 1
@@ -128,23 +161,8 @@ edges:
     v: 1
     cost: 1.0</textarea>
               </div>
-
-              <div class="part-params">
-                <div class="param-item">
-                  <label>k (Parts)</label>
-                  <input id="part-k" type="number" value="2" min="2">
-                </div>
-                <div class="param-item">
-                  <label>Balance</label>
-                  <input id="part-bal" type="number" value="2.0" step="0.5">
-                </div>
-                <div class="param-item">
-                  <label>Seed</label>
-                  <input id="part-seed" type="number" value="42">
-                </div>
-                <div style="flex:1;display:flex;justify-content:flex-end;">
-                  <button id="part-run-btn" class="btn btn-primary">Run</button>
-                </div>
+              <div class="yaml-footer-actions">
+                <button class="btn-thin" id="part-fs-yaml" title="Fullscreen YAML">&#x26F6; Fullscreen</button>
               </div>
             </div>
 
@@ -157,8 +175,29 @@ edges:
               <div class="part-stat"><div class="part-stat-val" id="part-s-cut">-</div><div class="part-stat-lbl">Cut</div></div>
             </div>
 
+            <!-- Graph canvas with overlay controls -->
             <div class="part-canvas-wrap">
               <div id="part-hud" class="part-hud">waiting...</div>
+              <!-- Overlay controls inside canvas — thin, map-style -->
+              <div class="graph-overlay-controls">
+                <div class="graph-param-row">
+                  <label class="graph-param-lbl">k</label>
+                  <input id="part-k" class="graph-param-input" type="number" value="2" min="2">
+                </div>
+                <div class="graph-param-row">
+                  <label class="graph-param-lbl">Bal</label>
+                  <input id="part-bal" class="graph-param-input" type="number" value="2.0" step="0.5">
+                </div>
+                <div class="graph-param-row">
+                  <label class="graph-param-lbl">Seed</label>
+                  <input id="part-seed" class="graph-param-input" type="number" value="42">
+                </div>
+                <button id="part-run-btn" class="graph-run-btn">RUN</button>
+              </div>
+              <!-- Enlarge button on right side -->
+              <button class="graph-enlarge-btn" id="part-fs-graph" title="Enlarge graph">&#x26F6;</button>
+              <!-- Rotation badge -->
+              <div class="graph-rotation-badge" id="graph-rotation-badge">0.0 deg</div>
               <canvas id="part-canvas"></canvas>
               <div id="part-tooltip"></div>
             </div>
@@ -167,16 +206,21 @@ edges:
 
             <div id="part-export" class="part-export" style="display:none;"></div>
 
-            <div class="part-terminal-wrap" style="margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;">
-              <div style="font-size:0.75rem; color:var(--muted); margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
-                <span>ROS2 Node Logs <span id="log-robot-target" style="color:var(--accent);"></span></span>
-                <div style="display:flex; gap: 4px;">
-                  <button id="btn-stop-node" class="btn btn-danger" style="padding: 2px 5px; font-size: 0.7rem; display:none;">Stop Node</button>
-                  <button id="btn-clear-logs" class="btn btn-text" style="padding: 2px 5px; font-size: 0.7rem;">Clear</button>
+            <!-- Logs section with R1/R2 tabs -->
+            <div class="part-terminal-wrap">
+              <div class="terminal-tabs-row">
+                <div class="terminal-tabs">
+                  <button class="terminal-tab active" id="log-tab-robot1" data-log-robot="robot1">Robot 1</button>
+                  <button class="terminal-tab" id="log-tab-robot2" data-log-robot="robot2">Robot 2</button>
+                </div>
+                <div class="terminal-actions">
+                  <button id="btn-stop-node" class="btn-thin btn-thin-danger" style="display:none;">Stop Node</button>
+                  <button id="btn-clear-logs" class="btn-thin">Clear</button>
                 </div>
               </div>
-              <div id="part-terminal-output" style="background:var(--bg); border:1px solid var(--border); border-radius:4px; height:200px; overflow-y:auto; padding:8px; font-family:monospace; font-size:0.75rem; color:var(--text); white-space:pre-wrap;"></div>
+              <div id="part-terminal-output" class="terminal-output"></div>
             </div>
+
           </div>
         </div>
 
@@ -221,19 +265,22 @@ edges:
 <!-- Fullscreen YAML overlay -->
 <div class="fullscreen-overlay" id="fs-yaml-overlay">
   <div class="fullscreen-header">
-    <h3>YAML Editor</h3>
-    <button class="btn btn-text" id="fs-yaml-close">Close</button>
+    <span>YAML EDITOR</span>
+    <button class="btn-thin" id="fs-yaml-close">Close</button>
   </div>
   <div class="fullscreen-body">
-    <textarea id="fs-yaml-textarea" spellcheck="false"></textarea>
+    <div class="fs-yaml-inner">
+      <pre class="yaml-highlight fs-yaml-highlight" id="fs-yaml-highlight"></pre>
+      <textarea id="fs-yaml-textarea" spellcheck="false"></textarea>
+    </div>
   </div>
 </div>
 
 <!-- Fullscreen Graph overlay -->
 <div class="fullscreen-overlay" id="fs-graph-overlay">
   <div class="fullscreen-header">
-    <h3>Graph Visualization</h3>
-    <button class="btn btn-text" id="fs-graph-close">Close</button>
+    <span>GRAPH VISUALIZATION</span>
+    <button class="btn-thin" id="fs-graph-close">Close</button>
   </div>
   <div class="fullscreen-body">
     <canvas id="fs-graph-canvas"></canvas>

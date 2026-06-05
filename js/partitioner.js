@@ -47,11 +47,9 @@ function highlightYAML(text) {
     if (!line.trim() || line.trim().startsWith('#')) {
       return `<span class="yaml-comment">${_esc(line)}</span>`;
     }
-    // Section headers
     if (/^(nodes|edges)\s*:/.test(line.trim())) {
       return `<span class="yaml-key">${_esc(line.replace(/^(nodes|edges)/, '$1'))}</span>`;
     }
-    // List item with key: value
     const li = line.match(/^(\s*)(-)\s+(.*)/);
     if (li) {
       const indent = _esc(li[1]);
@@ -59,7 +57,6 @@ function highlightYAML(text) {
       const rest = _highlightKV(li[3]);
       return `${indent}${dash} ${rest}`;
     }
-    // Key: value (indented)
     const kv = line.match(/^(\s+)(\w+)\s*:\s*(.*)/);
     if (kv) {
       const indent = _esc(kv[1]);
@@ -241,12 +238,19 @@ function makeRng(seed) {
 
 // ── Canvas rendering ──
 let cv, ctx, graphData = null, result = null;
-let tfm = { x: 0, y: 0, scale: 1 };
+let tfm = { x: 0, y: 0, scale: 1, rotation: 0 };
 let drag = false, dragStart = {}, tfmStart = {};
+let isRotating = false, rotationCenter = { x: 0, y: 0 };
+let mouseStartAngle = 0, rotationStartAngle = 0;
 let hoveredNode = null;
+let rotationBadgeTimeout = null;
 
-function w2s(wx, wy) { return { x: wx * tfm.scale + tfm.x, y: -wy * tfm.scale + tfm.y }; }
-function s2w(sx, sy) { return { x: (sx - tfm.x) / tfm.scale, y: -(sy - tfm.y) / tfm.scale }; }
+function w2s(wx, wy) {
+  return { x: wx * tfm.scale + tfm.x, y: -wy * tfm.scale + tfm.y };
+}
+function s2w(sx, sy) {
+  return { x: (sx - tfm.x) / tfm.scale, y: -(sy - tfm.y) / tfm.scale };
+}
 
 function lighten(hex, a) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -265,6 +269,7 @@ function fitGraph(nodes) {
   tfm.scale = Math.min((r.width - pad * 2) / gw, (r.height - pad * 2) / gh, 100);
   tfm.x = r.width / 2 - tfm.scale * (x0 + x1) / 2;
   tfm.y = r.height / 2 + tfm.scale * (y0 + y1) / 2;
+  tfm.rotation = 0;
 }
 
 function draw() {
@@ -277,7 +282,7 @@ function draw() {
 
   if (!graphData) {
     ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.font = '13px Montserrat, sans-serif';
+    ctx.font = '12px Montserrat, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Enter graph YAML and click Run', r.width / 2, r.height / 2);
     return;
@@ -285,6 +290,13 @@ function draw() {
   const { nodes, edges } = graphData;
   const labels = result ? result.labels : null;
   const seeds = result ? new Set(result.seeds) : new Set();
+
+  ctx.save();
+  if (tfm.rotation !== 0) {
+    ctx.translate(r.width / 2, r.height / 2);
+    ctx.rotate(tfm.rotation * Math.PI / 180);
+    ctx.translate(-r.width / 2, -r.height / 2);
+  }
 
   for (const e of edges) {
     const nu = nodes.find(n => n.id === e.u);
@@ -341,7 +353,25 @@ function draw() {
       ctx.fillText(n.id, p.x, p.y);
     }
   }
+
+  ctx.restore();
   ctx.textBaseline = 'alphabetic';
+}
+
+function _showGraphRotationBadge(deg) {
+  const badge = document.getElementById('graph-rotation-badge');
+  if (badge) {
+    badge.textContent = `${deg.toFixed(1)} deg`;
+    badge.classList.add('visible');
+  }
+  if (rotationBadgeTimeout) clearTimeout(rotationBadgeTimeout);
+}
+
+function _hideGraphRotationBadgeDelayed() {
+  rotationBadgeTimeout = setTimeout(() => {
+    const badge = document.getElementById('graph-rotation-badge');
+    if (badge) badge.classList.remove('visible');
+  }, 1500);
 }
 
 function doResize() {
@@ -392,25 +422,42 @@ function _updateYAMLHighlight() {
   pre.innerHTML = highlightYAML(ta.value) + '\n';
 }
 
+function _updateFsYAMLHighlight() {
+  const ta = document.getElementById('fs-yaml-textarea');
+  const pre = document.getElementById('fs-yaml-highlight');
+  if (!ta || !pre) return;
+  pre.innerHTML = highlightYAML(ta.value) + '\n';
+}
+
 // ── Fullscreen ──
 let fsGraphCanvas = null, fsGraphCtx = null, fsGraphActive = false;
 let fsYamlActive = false;
 
 function _initFullscreen() {
-  // YAML fullscreen
+  // YAML fullscreen — triggered by both inline and footer button
+  const openFsYaml = () => {
+    const overlay = document.getElementById('fs-yaml-overlay');
+    const ta = document.getElementById('fs-yaml-textarea');
+    const src = document.getElementById('part-yaml');
+    if (overlay && ta && src) {
+      ta.value = src.value;
+      _updateFsYAMLHighlight();
+      overlay.classList.add('active');
+      fsYamlActive = true;
+      ta.addEventListener('input', _updateFsYAMLHighlight);
+      ta.addEventListener('scroll', () => {
+        const pre = document.getElementById('fs-yaml-highlight');
+        if (pre) pre.scrollTop = ta.scrollTop;
+      });
+    }
+  };
+
+  const fsYamlBtnInline = document.getElementById('part-fs-yaml-inline');
+  if (fsYamlBtnInline) fsYamlBtnInline.addEventListener('click', openFsYaml);
+
   const fsYamlBtn = document.getElementById('part-fs-yaml');
-  if (fsYamlBtn) {
-    fsYamlBtn.addEventListener('click', () => {
-      const overlay = document.getElementById('fs-yaml-overlay');
-      const ta = document.getElementById('fs-yaml-textarea');
-      const src = document.getElementById('part-yaml');
-      if (overlay && ta && src) {
-        ta.value = src.value;
-        overlay.classList.add('active');
-        fsYamlActive = true;
-      }
-    });
-  }
+  if (fsYamlBtn) fsYamlBtn.addEventListener('click', openFsYaml);
+
   const fsYamlClose = document.getElementById('fs-yaml-close');
   if (fsYamlClose) {
     fsYamlClose.addEventListener('click', () => {
@@ -464,7 +511,6 @@ function _resizeFsGraph() {
   fsGraphCanvas.style.width = r.width + 'px';
   fsGraphCanvas.style.height = r.height + 'px';
   fsGraphCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // Draw in fullscreen context
   _drawInContext(fsGraphCtx, fsGraphCanvas.getBoundingClientRect());
 }
 
@@ -485,7 +531,6 @@ function _drawInContext(ctx, r) {
   const labels = result ? result.labels : null;
   const seeds = result ? new Set(result.seeds) : new Set();
 
-  // Fit to fullscreen
   const pad = 80;
   const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
@@ -543,6 +588,72 @@ function _drawInContext(ctx, r) {
   }
 }
 
+// ── Log tabs ──
+const logBuffers = { robot1: '', robot2: '' };
+let activeLogTab = 'robot1';
+let logEventSources = { robot1: null, robot2: null };
+
+function _initLogTabs() {
+  document.querySelectorAll('.terminal-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const robot = tab.dataset.logRobot;
+      if (!robot || robot === activeLogTab) return;
+      activeLogTab = robot;
+      document.querySelectorAll('.terminal-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      _renderLogOutput();
+    });
+  });
+}
+
+function _renderLogOutput() {
+  const outputBox = document.getElementById('part-terminal-output');
+  if (outputBox) outputBox.textContent = logBuffers[activeLogTab] || '';
+  if (outputBox) outputBox.scrollTop = outputBox.scrollHeight;
+  const stopBtn = document.getElementById('btn-stop-node');
+  if (stopBtn) stopBtn.style.display = logEventSources[activeLogTab] ? 'inline-flex' : 'none';
+}
+
+function startLogStream(robotKey) {
+  const outputBox = document.getElementById('part-terminal-output');
+  const stopBtn = document.getElementById('btn-stop-node');
+
+  logBuffers[robotKey] = `--- Connecting to logs for ${robotKey} ---\n`;
+
+  // Switch to this robot's tab
+  activeLogTab = robotKey;
+  document.querySelectorAll('.terminal-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.logRobot === robotKey);
+  });
+  _renderLogOutput();
+
+  if (logEventSources[robotKey]) {
+    logEventSources[robotKey].close();
+    logEventSources[robotKey] = null;
+  }
+
+  const es = new EventSource(`/logs?robot=${robotKey}`);
+  logEventSources[robotKey] = es;
+
+  if (stopBtn && activeLogTab === robotKey) stopBtn.style.display = 'inline-flex';
+
+  es.onmessage = (e) => {
+    logBuffers[robotKey] += e.data + '\n';
+    if (activeLogTab === robotKey) {
+      const box = document.getElementById('part-terminal-output');
+      if (box) { box.textContent = logBuffers[robotKey]; box.scrollTop = box.scrollHeight; }
+    }
+  };
+
+  es.onerror = () => {
+    logBuffers[robotKey] += `\n--- Stream finished or disconnected ---\n`;
+    if (activeLogTab === robotKey) _renderLogOutput();
+    es.close();
+    logEventSources[robotKey] = null;
+    if (activeLogTab === robotKey && stopBtn) stopBtn.style.display = 'none';
+  };
+}
+
 // ── Public API ──
 
 export function initPartitioner() {
@@ -552,20 +663,49 @@ export function initPartitioner() {
   doResize();
   window.addEventListener('resize', doResize);
 
-  cv.addEventListener('mousedown', e => {
-    const r = cv.getBoundingClientRect();
-    drag = true;
-    dragStart = { x: e.clientX - r.left, y: e.clientY - r.top };
-    tfmStart = { ...tfm };
-  });
-  cv.addEventListener('mousemove', e => {
+  cv.addEventListener('contextmenu', (e) => e.preventDefault());
+
+  cv.addEventListener('mousedown', (e) => {
     const r = cv.getBoundingClientRect();
     const mx = e.clientX - r.left, my = e.clientY - r.top;
+
+    if (e.button === 2) {
+      // RViz-style orbital rotation
+      isRotating = true;
+      rotationCenter = { x: r.width / 2, y: r.height / 2 };
+      mouseStartAngle = Math.atan2(my - rotationCenter.y, mx - rotationCenter.x);
+      rotationStartAngle = tfm.rotation * Math.PI / 180;
+      cv.style.cursor = 'crosshair';
+    } else if (e.button === 0) {
+      drag = true;
+      dragStart = { x: mx, y: my };
+      tfmStart = { ...tfm };
+      cv.style.cursor = 'grabbing';
+    }
+  });
+
+  cv.addEventListener('mousemove', (e) => {
+    const r = cv.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+
+    if (isRotating) {
+      const currentAngle = Math.atan2(my - rotationCenter.y, mx - rotationCenter.x);
+      let deltaAngle = currentAngle - mouseStartAngle;
+      while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+      while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+      const newRad = rotationStartAngle + deltaAngle;
+      tfm.rotation = newRad * 180 / Math.PI;
+      _showGraphRotationBadge(tfm.rotation);
+      draw();
+      return;
+    }
+
     if (drag) {
       tfm.x = tfmStart.x + (mx - dragStart.x);
       tfm.y = tfmStart.y + (my - dragStart.y);
       draw(); return;
     }
+
     if (!graphData) return;
     const w = s2w(mx, my);
     const nrr = Math.max(6, Math.min(24, tfm.scale * 0.6));
@@ -587,13 +727,27 @@ export function initPartitioner() {
       tip.style.top = (my - 12) + 'px';
     } else if (tip) { tip.style.display = 'none'; }
   });
-  cv.addEventListener('mouseup', () => { drag = false; });
+
+  cv.addEventListener('mouseup', (e) => {
+    if (e.button === 2) {
+      isRotating = false;
+      cv.style.cursor = 'grab';
+      _hideGraphRotationBadgeDelayed();
+    } else {
+      drag = false;
+      cv.style.cursor = 'grab';
+    }
+  });
+
   cv.addEventListener('mouseleave', () => {
-    drag = false; hoveredNode = null;
+    drag = false; isRotating = false; hoveredNode = null;
+    cv.style.cursor = 'grab';
+    _hideGraphRotationBadgeDelayed();
     const tip = document.getElementById('part-tooltip');
     if (tip) tip.style.display = 'none';
     draw();
   });
+
   cv.addEventListener('wheel', e => {
     e.preventDefault();
     const r = cv.getBoundingClientRect();
@@ -604,6 +758,8 @@ export function initPartitioner() {
     tfm.x = mx - wx * tfm.scale; tfm.y = my - wy * tfm.scale;
     draw();
   }, { passive: false });
+
+  cv.style.cursor = 'grab';
 
   const runBtn = document.getElementById('part-run-btn');
   if (runBtn) runBtn.addEventListener('click', runPartition);
@@ -623,8 +779,8 @@ export function initPartitioner() {
   const clearBtn = document.getElementById('btn-clear-logs');
   if (clearBtn) {
     clearBtn.addEventListener('click', () => {
-      const outputBox = document.getElementById('part-terminal-output');
-      if (outputBox) outputBox.textContent = '';
+      logBuffers[activeLogTab] = '';
+      _renderLogOutput();
     });
   }
 
@@ -632,63 +788,29 @@ export function initPartitioner() {
   const stopBtn = document.getElementById('btn-stop-node');
   if (stopBtn) {
     stopBtn.addEventListener('click', async () => {
-      if (!currentLogRobot) return;
+      const robotKey = activeLogTab;
       try {
         await fetch('/stop', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ robot: currentLogRobot })
+          body: JSON.stringify({ robot: robotKey })
         });
         stopBtn.style.display = 'none';
-        if (logEventSource) {
-          logEventSource.close();
-          logEventSource = null;
+        if (logEventSources[robotKey]) {
+          logEventSources[robotKey].close();
+          logEventSources[robotKey] = null;
         }
-        const outputBox = document.getElementById('part-terminal-output');
-        if (outputBox) outputBox.textContent += `\n--- Node for ${currentLogRobot} stopped by user ---\n`;
-        currentLogRobot = null;
-      } catch (e) {
-        console.error(e);
+        logBuffers[robotKey] += `\n--- Node for ${robotKey} stopped by user ---\n`;
+        _renderLogOutput();
+      } catch (err) {
+        console.error(err);
       }
     });
   }
 
+  _initLogTabs();
   _initFullscreen();
   draw();
-}
-
-let logEventSource = null;
-let currentLogRobot = null;
-
-function startLogStream(robotKey) {
-  currentLogRobot = robotKey;
-  const targetLabel = document.getElementById('log-robot-target');
-  const outputBox = document.getElementById('part-terminal-output');
-  const stopBtn = document.getElementById('btn-stop-node');
-  
-  if (!outputBox) return;
-
-  if (targetLabel) targetLabel.textContent = `(${robotKey})`;
-  outputBox.textContent = `--- Connecting to logs for ${robotKey} ---\n`;
-  if (stopBtn) stopBtn.style.display = 'inline-block';
-
-  if (logEventSource) {
-    logEventSource.close();
-  }
-
-  logEventSource = new EventSource(`/logs?robot=${robotKey}`);
-  
-  logEventSource.onmessage = (e) => {
-    outputBox.textContent += e.data + '\n';
-    outputBox.scrollTop = outputBox.scrollHeight;
-  };
-  
-  logEventSource.onerror = (err) => {
-    outputBox.textContent += `\n--- Stream finished or disconnected ---\n`;
-    if (stopBtn && currentLogRobot === robotKey) stopBtn.style.display = 'none';
-    logEventSource.close();
-    logEventSource = null;
-  };
 }
 
 export function runPartition() {
@@ -783,11 +905,8 @@ export function runPartition() {
           };
           exportEl.appendChild(dlBtn);
 
-          // Deploy with robot selector
           const deployWrap = document.createElement('span');
-          deployWrap.style.display = 'inline-flex';
-          deployWrap.style.alignItems = 'center';
-          deployWrap.style.gap = '3px';
+          deployWrap.style.cssText = 'display:inline-flex;align-items:center;gap:3px;';
 
           const sel = document.createElement('select');
           sel.className = 'deploy-select';
@@ -799,25 +918,22 @@ export function runPartition() {
           deployBtn.onclick = async () => {
             const robotKey = sel.value;
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
-            
             deployBtn.textContent = 'Sending...';
             try {
-              const res = await fetch('/launch', {
+              const resp = await fetch('/launch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ robot: robotKey, yaml: yamlOut })
               });
-              if (!res.ok) throw new Error('Backend error ' + res.status);
-              
+              if (!resp.ok) throw new Error('Backend error ' + resp.status);
               deployBtn.textContent = 'Launched!';
               setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
-              
               startLogStream(robotKey);
             } catch (err) {
               console.error(err);
               deployBtn.textContent = 'Failed';
               setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
-              alert("Ensure server.py is running! Error: " + err.message);
+              alert('Ensure server.py is running! Error: ' + err.message);
             }
           };
 
@@ -834,7 +950,6 @@ export function runPartition() {
         hud.className = 'part-hud' + (allConn ? ' active' : '');
       }
 
-      // Update fullscreen graph if open
       if (fsGraphActive) _resizeFsGraph();
 
     } catch (err) {

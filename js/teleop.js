@@ -62,14 +62,10 @@ const btnToKey = {
 };
 
 export function initTeleop() {
-  const selector = document.getElementById('teleop-robot');
-  if (selector) {
-    selector.addEventListener('change', () => {
-      selectedRobot = selector.value;
-      _updateRobotIndicator();
-      x = 0; y = 0; z = 0; th = 0; // stop moving when switching robots
-    });
-  }
+  document.addEventListener('robot-tab-change', (e) => {
+    selectedRobot = e.detail.robot;
+    x = 0; y = 0; z = 0; th = 0;
+  });
 
   // Keyboard events
   document.addEventListener('keydown', (e) => {
@@ -143,7 +139,6 @@ export function initTeleop() {
     });
   }
 
-  _updateRobotIndicator();
   _updateSliders();
 
   if (!publishInterval) {
@@ -204,13 +199,6 @@ function _updateSliders() {
   if (angSlider) angSlider.value = turn;
 }
 
-function _updateRobotIndicator() {
-  const indicator = document.getElementById('teleop-robot-label');
-  if (indicator) {
-    indicator.textContent = selectedRobot === 'robot1' ? 'Robot 1' : 'Robot 2';
-    indicator.style.color = selectedRobot === 'robot1' ? 'var(--blue)' : 'var(--orange)';
-  }
-}
 
 function _updateHolonomicUI(isHolonomic) {
   const track = document.getElementById('holonomic-switch');
