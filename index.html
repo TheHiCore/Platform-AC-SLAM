@@ -5,15 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AC-SLAM Mission Control</title>
   <link rel="stylesheet" href="css/main.css">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
-  <!-- Header -->
-  <header class="app-header">
+<div class="app-shell">
+
+  <!-- App Bar -->
+  <header class="app-bar">
     <div class="brand">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 2L2 7l10 5 10-5-10-5zm0 7.5l-10-5v10l10 5 10-5v-10l-10 5z"/></svg>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--primary)"><path d="M12 2L2 7l10 5 10-5-10-5zm0 7.5l-10-5v10l10 5 10-5v-10l-10 5z"/></svg>
       AC-SLAM Mission Control
     </div>
+    <div class="spacer"></div>
     <div class="connection-bar">
       <input type="text" id="input-ros-url" class="conn-input" value="ws://localhost:9090" />
       <button id="btn-connect" class="btn btn-primary">Connect</button>
@@ -24,91 +28,70 @@
     </div>
   </header>
 
-  <!-- Main Layout -->
+  <!-- Main Layout: Left Panel + Right Maps -->
   <div class="app-main">
-    
-    <!-- Top Panels (Maps + Teleop) -->
-    <div class="top-panels">
-      <div class="panel">
-        <div class="panel-header">Robot 1 Map</div>
-        <div class="map-container">
-          <canvas id="map-robot1"></canvas>
-        </div>
-      </div>
-      
-      <div class="panel">
-        <div class="panel-header">Robot 2 Map</div>
-        <div class="map-container">
-          <canvas id="map-robot2"></canvas>
-        </div>
+
+    <!-- Left Panel -->
+    <div class="left-panel">
+
+      <!-- Mode Selector: Teleop vs Partitioner -->
+      <div class="mode-selector">
+        <button class="mode-btn active" data-mode="teleop">Teleop</button>
+        <button class="mode-btn" data-mode="partitioner">Graph Partitioner</button>
       </div>
 
-      <div class="panel">
-        <div class="panel-header">Teleop Control</div>
-        <div class="teleop-ui">
-          <div class="teleop-header">
-            <span id="teleop-robot-label" style="font-weight:bold;color:var(--accent);">Robot 1</span>
-            <select id="teleop-robot" class="robot-select">
-              <option value="robot1">Robot 1</option>
-              <option value="robot2">Robot 2</option>
-            </select>
-          </div>
-          
-          <div class="d-pad">
-            <button id="btn-fwd" class="d-btn d-up">↑</button>
-            <button id="btn-left" class="d-btn d-left">←</button>
-            <button id="btn-stop" class="d-btn d-stop">■</button>
-            <button id="btn-right" class="d-btn d-right">→</button>
-            <button id="btn-back" class="d-btn d-down">↓</button>
-          </div>
+      <!-- Mode Content -->
+      <div class="mode-content">
 
-          <div class="sliders">
-            <div class="slider-row">
-              <label>Linear (m/s): <span id="teleop-speed-val">0.20</span></label>
-              <input type="range" id="teleop-speed" min="0.05" max="0.5" step="0.05" value="0.2">
+        <!-- Teleop Mode -->
+        <div id="mode-teleop" class="mode-panel active">
+          <div class="teleop-ui">
+            <div class="teleop-header">
+              <span id="teleop-robot-label" style="font-weight:var(--fw-bold);color:var(--primary);">Robot 1</span>
+              <select id="teleop-robot" class="robot-select">
+                <option value="robot1">Robot 1</option>
+                <option value="robot2">Robot 2</option>
+              </select>
             </div>
-            <div class="slider-row">
-              <label>Angular (rad/s): <span id="teleop-angular-speed-val">0.50</span></label>
-              <input type="range" id="teleop-angular-speed" min="0.1" max="1.5" step="0.1" value="0.5">
+
+            <div class="d-pad">
+              <button id="btn-fwd" class="d-btn d-up">&#8593;</button>
+              <button id="btn-left" class="d-btn d-left">&#8592;</button>
+              <button id="btn-stop" class="d-btn d-stop">&#9632;</button>
+              <button id="btn-right" class="d-btn d-right">&#8594;</button>
+              <button id="btn-back" class="d-btn d-down">&#8595;</button>
+            </div>
+
+            <div class="sliders">
+              <div class="slider-row">
+                <label>Linear (m/s): <span id="teleop-speed-val">0.20</span></label>
+                <input type="range" id="teleop-speed" min="0.05" max="0.5" step="0.05" value="0.2">
+              </div>
+              <div class="slider-row">
+                <label>Angular (rad/s): <span id="teleop-angular-speed-val">0.50</span></label>
+                <input type="range" id="teleop-angular-speed" min="0.1" max="1.5" step="0.1" value="0.5">
+              </div>
+            </div>
+
+            <div class="teleop-stats">
+              <div>v: <span id="vel-linear">0.00</span></div>
+              <div>&#969;: <span id="vel-angular">0.00</span></div>
             </div>
           </div>
-
-          <div class="teleop-stats">
-            <div>v: <span id="vel-linear">0.00</span></div>
-            <div>ω: <span id="vel-angular">0.00</span></div>
-          </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Middle Panel (Merged Map) -->
-    <div class="merged-map-panel">
-      <div class="panel-header">Merged Global Map</div>
-      <div class="map-container">
-        <canvas id="map-merged"></canvas>
-      </div>
-    </div>
-
-    <!-- Bottom Area (Tabs) -->
-    <div class="bottom-area">
-      <div class="tabs">
-        <button class="tab-btn active" data-target="tab-part">Graph Partitioner</button>
-        <button class="tab-btn" data-target="tab-params">Parameters</button>
-        <button class="tab-btn" data-target="tab-metrics">Metrics</button>
-      </div>
-
-      <!-- Partitioner Tab -->
-      <div id="tab-part" class="tab-content active" style="flex-direction:row;">
-        <div class="part-sidebar">
-          <label style="font-size:0.8rem;color:var(--muted);display:block;margin-bottom:5px;">YAML Input</label>
-          <textarea id="part-yaml" class="part-ta">
-nodes:
+        <!-- Partitioner Mode -->
+        <div id="mode-partitioner" class="mode-panel">
+          <div class="part-container">
+            <div class="part-top">
+              <label>Graph Definition (YAML)</label>
+              <textarea id="part-yaml" class="part-ta">nodes:
   - id: 1
     x: 0.0
     y: 0.0
   - id: 2
     x: -3.0
-    y: 8.0 
+    y: 8.0
   - id: 3
     x: -7.0
     y: 5.0
@@ -121,94 +104,141 @@ edges:
     cost: 1.0
   - u: 3
     v: 1
-    cost: 1.0
-          </textarea>
-          
-          <div style="display:flex;gap:10px;margin-bottom:10px;">
-            <div><label style="font-size:0.7rem;">k (Parts)</label><br><input id="part-k" type="number" value="2" min="2" style="width:50px;" class="conn-input"></div>
-            <div><label style="font-size:0.7rem;">Balance</label><br><input id="part-bal" type="number" value="2.0" step="0.5" style="width:50px;" class="conn-input"></div>
-            <div><label style="font-size:0.7rem;">Seed</label><br><input id="part-seed" type="number" value="42" style="width:50px;" class="conn-input"></div>
-          </div>
-          
-          <button id="part-run-btn" class="btn btn-primary" style="width:100%;margin-bottom:10px;">▶ Run Partitioning</button>
-          
-          <div id="part-error" style="color:var(--red);font-size:0.8rem;display:none;margin-bottom:10px;"></div>
-          
-          <div id="part-stats" style="display:none;font-size:0.8rem;margin-bottom:10px;border-top:1px solid var(--border);padding-top:10px;">
-            Nodes: <b id="part-s-nodes"></b> | Edges: <b id="part-s-edges"></b><br>
-            Parts: <b id="part-s-k"></b> | Cut Cost: <b id="part-s-cut"></b>
-          </div>
+    cost: 1.0</textarea>
 
-          <div id="part-legend" style="display:none;border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px;">
-            <div style="font-size:0.7rem;color:var(--muted);margin-bottom:5px;">REGIONS</div>
-            <div id="part-legend-rows"></div>
-          </div>
+              <div class="part-params">
+                <div class="param-item">
+                  <label>k (Parts)</label>
+                  <input id="part-k" type="number" value="2" min="2">
+                </div>
+                <div class="param-item">
+                  <label>Balance</label>
+                  <input id="part-bal" type="number" value="2.0" step="0.5">
+                </div>
+                <div class="param-item">
+                  <label>Seed</label>
+                  <input id="part-seed" type="number" value="42">
+                </div>
+                <div style="flex:1;display:flex;justify-content:flex-end;">
+                  <button id="part-run-btn" class="btn btn-primary">Run</button>
+                </div>
+              </div>
+            </div>
 
-          <div id="part-export" style="display:none;border-top:1px solid var(--border);padding-top:10px;">
-            <div style="font-size:0.7rem;color:var(--muted);margin-bottom:5px;">EXPORT & DEPLOY</div>
-            <div id="part-export-btns" style="display:flex;flex-direction:column;gap:5px;"></div>
+            <div id="part-error"></div>
+
+            <div id="part-stats" class="part-stats-row" style="display:none;">
+              <div class="part-stat"><div class="part-stat-val" id="part-s-nodes">-</div><div class="part-stat-lbl">Nodes</div></div>
+              <div class="part-stat"><div class="part-stat-val" id="part-s-edges">-</div><div class="part-stat-lbl">Edges</div></div>
+              <div class="part-stat"><div class="part-stat-val" id="part-s-k">-</div><div class="part-stat-lbl">Parts</div></div>
+              <div class="part-stat"><div class="part-stat-val" id="part-s-cut">-</div><div class="part-stat-lbl">Cut</div></div>
+            </div>
+
+            <div class="part-canvas-wrap">
+              <div id="part-hud" class="part-hud">waiting...</div>
+              <canvas id="part-canvas"></canvas>
+              <div id="part-tooltip"></div>
+            </div>
+
+            <div id="part-legend" class="part-legend" style="display:none;"></div>
+
+            <div id="part-export" class="part-export" style="display:none;"></div>
           </div>
         </div>
-        
-        <div class="part-main" style="flex:1;position:relative;">
-          <div id="part-hud" style="position:absolute;top:10px;left:10px;background:var(--surf);border:1px solid var(--border);padding:2px 8px;border-radius:4px;font-size:0.7rem;color:var(--muted);">waiting...</div>
-          <canvas id="part-canvas"></canvas>
-          <div id="part-tooltip"></div>
-        </div>
+
       </div>
 
-      <!-- Parameters Tab -->
-      <div id="tab-params" class="tab-content">
-        <div class="params-wrapper">
-          <div class="params-controls">
-            <div>
-              <span style="font-weight:bold;margin-right:10px;">Target Robot:</span>
-              <select id="params-robot" class="robot-select">
-                <option value="robot1">Robot 1</option>
-                <option value="robot2">Robot 2</option>
-              </select>
-            </div>
-            <div>
-              <button id="params-read" class="btn">Read from Robot</button>
-              <button id="params-apply" class="btn btn-primary">Apply Parameters</button>
-            </div>
-          </div>
-          <div id="params-status" class="params-status"></div>
-          <div id="params-container" style="margin-top:1rem;"></div>
+      <!-- Bottom Tabs (Left Side Only) -->
+      <div class="left-bottom">
+        <div class="tab-bar">
+          <button class="tab-btn active" data-target="tab-metrics">Metrics</button>
+          <button class="tab-btn" data-target="tab-params">Parameters</button>
         </div>
-      </div>
 
-      <!-- Metrics Tab -->
-      <div id="tab-metrics" class="tab-content">
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-title">Mission Time</div>
-            <div id="metric-time" class="metric-val">00:00</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">R1 Map Explored</div>
-            <div id="metric-map-robot1" class="metric-val">0.0%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">R2 Map Explored</div>
-            <div id="metric-map-robot2" class="metric-val">0.0%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">Merged Map Explored</div>
-            <div id="metric-map-merged" class="metric-val">0.0%</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-title">Topic Health</div>
-            <div style="text-align:left;display:inline-block;margin-top:0.5rem;font-size:0.9rem;">
-              <div><span id="health-r1pose" class="health-dot offline"></span> Robot 1 Pose</div>
-              <div><span id="health-r2pose" class="health-dot offline"></span> Robot 2 Pose</div>
+        <div id="tab-metrics" class="tab-content active">
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-title">Mission Time</div>
+              <div id="metric-time" class="metric-val">00:00</div>
             </div>
+            <div class="metric-card">
+              <div class="metric-title">R1 Map Explored</div>
+              <div id="metric-map-robot1" class="metric-val">0.0%</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">R2 Map Explored</div>
+              <div id="metric-map-robot2" class="metric-val">0.0%</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-title">Merged Map</div>
+              <div id="metric-map-merged" class="metric-val">0.0%</div>
+            </div>
+            <div class="metric-card" style="grid-column: span 2;">
+              <div class="metric-title">Topic Health</div>
+              <div style="text-align:left;display:inline-block;margin-top:var(--sp-1);font-size:var(--fs-caption);">
+                <div class="health-row"><span id="health-r1pose" class="health-dot offline"></span> Robot 1 Pose</div>
+                <div class="health-row"><span id="health-r2pose" class="health-dot offline"></span> Robot 2 Pose</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-params" class="tab-content">
+          <div class="params-wrapper">
+            <div class="params-controls">
+              <div>
+                <span style="font-weight:var(--fw-medium);margin-right:var(--sp-2);font-size:var(--fs-caption);">Target:</span>
+                <select id="params-robot" class="robot-select">
+                  <option value="robot1">Robot 1</option>
+                  <option value="robot2">Robot 2</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:var(--sp-2);">
+                <button id="params-read" class="btn btn-text">Read</button>
+                <button id="params-apply" class="btn btn-primary">Apply</button>
+              </div>
+            </div>
+            <div id="params-status" class="params-status"></div>
+            <div id="params-container" style="margin-top:var(--sp-3);"></div>
           </div>
         </div>
       </div>
 
     </div>
+
+    <!-- Right Panel (Maps) -->
+    <div class="right-panel">
+
+      <!-- Big Map (currently selected) -->
+      <div class="map-big">
+        <div class="panel-header" id="map-big-header">Merged Global Map</div>
+        <div class="map-rotation-badge" id="map-rotation-badge">0.0 deg</div>
+        <div class="map-container">
+          <canvas id="map-big-canvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Map Thumbnails (click to swap into big panel) -->
+      <div class="map-thumbs">
+        <div class="map-thumb" data-map="robot1">
+          <div class="panel-header">Robot 1</div>
+          <canvas id="map-thumb-robot1"></canvas>
+        </div>
+        <div class="map-thumb" data-map="robot2">
+          <div class="panel-header">Robot 2</div>
+          <canvas id="map-thumb-robot2"></canvas>
+        </div>
+        <div class="map-thumb active" data-map="merged">
+          <div class="panel-header">Merged</div>
+          <canvas id="map-thumb-merged"></canvas>
+        </div>
+      </div>
+
+    </div>
+
   </div>
+
+</div>
 
   <!-- Scripts: load roslib first, then our modules -->
   <script src="lib/roslib.min.js"></script>

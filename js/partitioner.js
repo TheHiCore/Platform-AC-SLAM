@@ -1,14 +1,14 @@
 // ─── Graph Partitioner Module ───────────────────────────────────────────────
-// Ported from rg_visualizer.html — BFS region growing with canvas visualization.
+// BFS region growing with canvas visualization.
 
 import { publish, isConnected } from './connection.js';
 import { TOPICS } from '../config/topics.js';
 
 const COLORS = [
-  '#58a6ff','#3fb950','#f78166','#d2a679','#bc8cff',
-  '#79c0ff','#56d364','#ffa657','#ff7b72','#d2a8ff',
-  '#a5d6ff','#7ee787','#ffc680','#ff9492','#e2c5ff',
-  '#cae8ff','#abf2bc','#ffe0b2','#ffd0cc','#f0d9ff'
+  '#2196f3','#4caf50','#ff9800','#d2a679','#9c27b0',
+  '#00bcd4','#8bc34a','#ff5722','#e91e63','#795548',
+  '#03a9f4','#cddc39','#ff7043','#f06292','#a1887f',
+  '#4dd0e1','#dce775','#ff8a65','#f48fb1','#bcaaa4'
 ];
 const SEED_RING = '#f0e68c';
 
@@ -210,7 +210,7 @@ function lighten(hex, a) {
 
 function fitGraph(nodes) {
   const r = cv.getBoundingClientRect();
-  const pad = 90;
+  const pad = 60;
   const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
   const x0 = Math.min(...xs), x1 = Math.max(...xs);
   const y0 = Math.min(...ys), y1 = Math.max(...ys);
@@ -224,11 +224,16 @@ function draw() {
   if (!cv || !ctx) return;
   const r = cv.getBoundingClientRect();
   ctx.clearRect(0, 0, r.width, r.height);
+
+  // Background
+  ctx.fillStyle = '#121212';
+  ctx.fillRect(0, 0, r.width, r.height);
+
   if (!graphData) {
-    ctx.fillStyle = 'rgba(139,148,158,0.25)';
-    ctx.font = '13px "IBM Plex Mono", monospace';
+    ctx.fillStyle = 'rgba(136,136,136,0.25)';
+    ctx.font = '13px "Roboto Mono", monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('Enter graph YAML and click ▶ Run', r.width / 2, r.height / 2);
+    ctx.fillText('Enter graph YAML and click Run', r.width / 2, r.height / 2);
     return;
   }
   const { nodes, edges } = graphData;
@@ -243,17 +248,17 @@ function draw() {
     const isCut = labels && labels[e.u] !== labels[e.v];
     ctx.beginPath(); ctx.moveTo(pu.x, pu.y); ctx.lineTo(pv.x, pv.y);
     if (isCut) {
-      ctx.strokeStyle = 'rgba(248,81,73,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(244,67,54,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
     } else if (labels) {
       ctx.strokeStyle = COLORS[labels[e.u] % COLORS.length] + '44'; ctx.lineWidth = 2; ctx.setLineDash([]);
     } else {
-      ctx.strokeStyle = 'rgba(139,148,158,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(136,136,136,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([]);
     }
     ctx.stroke(); ctx.setLineDash([]);
     if (tfm.scale > 18) {
       const mx2 = (pu.x + pv.x) / 2, my2 = (pu.y + pv.y) / 2;
-      ctx.fillStyle = 'rgba(139,148,158,0.5)';
-      ctx.font = `${Math.min(10, tfm.scale * 0.17)}px "IBM Plex Mono"`;
+      ctx.fillStyle = 'rgba(136,136,136,0.5)';
+      ctx.font = `${Math.min(10, tfm.scale * 0.17)}px "Roboto Mono"`;
       ctx.textAlign = 'center';
       ctx.fillText(e.cost, mx2, my2 - 4);
     }
@@ -262,7 +267,7 @@ function draw() {
   const nr = Math.max(7, Math.min(24, tfm.scale * 0.6));
   for (const n of nodes) {
     const p = w2s(n.x, n.y);
-    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#58a6ff';
+    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#2196f3';
     const isSeed = seeds.has(n.id);
     const isHov = hoveredNode && hoveredNode.id === n.id;
     const rr = isHov ? nr * 1.25 : nr;
@@ -285,7 +290,7 @@ function draw() {
     ctx.lineWidth = isHov ? 2 : 1; ctx.stroke();
     if (rr > 9) {
       ctx.fillStyle = '#000';
-      ctx.font = `600 ${Math.min(rr * 0.75, 12)}px "IBM Plex Mono"`;
+      ctx.font = `600 ${Math.min(rr * 0.75, 12)}px "Roboto Mono"`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(n.id, p.x, p.y);
     }
@@ -296,7 +301,9 @@ function draw() {
 function doResize() {
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
-  const r = cv.parentElement.getBoundingClientRect();
+  const wrap = cv.parentElement;
+  if (!wrap) return;
+  const r = wrap.getBoundingClientRect();
   cv.width = r.width * dpr; cv.height = r.height * dpr;
   cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
   ctx.scale(dpr, dpr);
@@ -369,7 +376,7 @@ export function initPartitioner() {
       const col = p !== null ? COLORS[p % COLORS.length] : '#fff';
       tip.innerHTML = `<strong style="color:${col}">Node ${hit.id}</strong><br>` +
         (p !== null ? `Partition P${p}<br>` : '') +
-        `<span style="color:#484f58">x: ${hit.x.toFixed(2)}  y: ${hit.y.toFixed(2)}</span>`;
+        `<span style="color:var(--text-hint)">x: ${hit.x.toFixed(2)}  y: ${hit.y.toFixed(2)}</span>`;
       tip.style.display = 'block';
       tip.style.left = (mx + 16) + 'px';
       tip.style.top = (my - 12) + 'px';
@@ -393,7 +400,6 @@ export function initPartitioner() {
     draw();
   }, { passive: false });
 
-  // Run button
   const runBtn = document.getElementById('part-run-btn');
   if (runBtn) runBtn.addEventListener('click', runPartition);
 
@@ -409,8 +415,8 @@ export function runPartition() {
   const bal = parseFloat(document.getElementById('part-bal')?.value || '2.0');
   const seed = parseInt(document.getElementById('part-seed')?.value || '42');
 
-  if (isNaN(k) || k < 2) { _showPartErr('k must be ≥ 2'); return; }
-  if (isNaN(bal) || bal < 0) { _showPartErr('Balance must be ≥ 0'); return; }
+  if (isNaN(k) || k < 2) { _showPartErr('k must be >= 2'); return; }
+  if (isNaN(bal) || bal < 0) { _showPartErr('Balance must be >= 0'); return; }
 
   let parsed;
   try { parsed = parseYAML(yaml); }
@@ -421,7 +427,7 @@ export function runPartition() {
   if (k > nodes.length) { _showPartErr(`k=${k} > nodes=${nodes.length}`); return; }
 
   const hud = document.getElementById('part-hud');
-  if (hud) { hud.textContent = 'computing…'; hud.className = 'part-hud-chip'; }
+  if (hud) { hud.textContent = 'computing...'; hud.className = 'part-hud'; }
 
   setTimeout(() => {
     try {
@@ -451,15 +457,15 @@ export function runPartition() {
       _updateEl('part-s-cut', cutC.toFixed(1));
       _showEl('part-stats');
 
-      // Legend
+      // Legend — directly into #part-legend
       const partMap = {};
       for (const [id, p] of Object.entries(res.labels)) {
         partMap[p] = partMap[p] || []; partMap[p].push(id);
       }
       const totalSize = nodes.reduce((s, n) => s + (n.size || 1), 0);
-      const rows = document.getElementById('part-legend-rows');
-      if (rows) {
-        rows.innerHTML = '';
+      const legendEl = document.getElementById('part-legend');
+      if (legendEl) {
+        legendEl.innerHTML = '';
         for (let p = 0; p < k; p++) {
           const ns = partMap[p] || [];
           const sz = ns.reduce((s, id) => { const n = nodes.find(x => x.id == id); return s + (n?.size || 1); }, 0);
@@ -472,15 +478,15 @@ export function runPartition() {
             <span class="part-nodes">${ns.sort((a, b) => a - b).join(', ')}</span>
             <span class="part-count">${ns.length}n · ${pct}%</span>
             <span class="part-conn ${conn[p] ? 'ok' : 'bad'}">${conn[p] ? '✓' : '✗'}</span>`;
-          rows.appendChild(div);
+          legendEl.appendChild(div);
         }
       }
       _showEl('part-legend');
 
-      // Export + Deploy buttons
-      const btns = document.getElementById('part-export-btns');
-      if (btns) {
-        btns.innerHTML = '';
+      // Export + Deploy — directly into #part-export
+      const exportEl = document.getElementById('part-export');
+      if (exportEl) {
+        exportEl.innerHTML = '';
         for (let p = 0; p < k; p++) {
           const dlBtn = document.createElement('button');
           dlBtn.className = 'btn-export';
@@ -491,13 +497,12 @@ export function runPartition() {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob); a.download = `partition_${p}.yaml`; a.click();
           };
-          btns.appendChild(dlBtn);
+          exportEl.appendChild(dlBtn);
 
-          // Deploy button
           const deployBtn = document.createElement('button');
           deployBtn.className = 'btn-deploy';
           const robotKey = p === 0 ? 'robot1' : 'robot2';
-          deployBtn.innerHTML = `⬆ Deploy P${p} → ${robotKey}`;
+          deployBtn.textContent = `Deploy P${p} → ${robotKey}`;
           deployBtn.onclick = () => {
             if (!isConnected()) { alert('Not connected to rosbridge'); return; }
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
@@ -505,10 +510,10 @@ export function runPartition() {
             if (topic) {
               publish(topic, 'std_msgs/String', { data: yamlOut });
               deployBtn.textContent = '✓ Sent!';
-              setTimeout(() => { deployBtn.innerHTML = `⬆ Deploy P${p} → ${robotKey}`; }, 2000);
+              setTimeout(() => { deployBtn.textContent = `Deploy P${p} → ${robotKey}`; }, 2000);
             }
           };
-          btns.appendChild(deployBtn);
+          exportEl.appendChild(deployBtn);
         }
       }
       _showEl('part-export');
@@ -516,7 +521,7 @@ export function runPartition() {
       const allConn = conn.every(Boolean);
       if (hud) {
         hud.textContent = `partitioned · k=${k} · ${allConn ? 'all connected ✓' : 'check connectivity ⚠'}`;
-        hud.className = 'part-hud-chip' + (allConn ? ' active' : '');
+        hud.className = 'part-hud' + (allConn ? ' active' : '');
       }
     } catch (err) {
       _showPartErr('Error: ' + err.message);

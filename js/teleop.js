@@ -108,7 +108,7 @@ function _updateRobotIndicator() {
   const indicator = document.getElementById('teleop-robot-label');
   if (indicator) {
     indicator.textContent = selectedRobot === 'robot1' ? 'Robot 1' : 'Robot 2';
-    indicator.style.color = selectedRobot === 'robot1' ? '#58a6ff' : '#3fb950';
+    indicator.style.color = selectedRobot === 'robot1' ? 'var(--primary)' : 'var(--secondary)';
   }
 }
 

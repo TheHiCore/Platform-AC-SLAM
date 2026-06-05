@@ -1,5 +1,5 @@
 // ─── App Initialization Module ──────────────────────────────────────────────
-// Entry point. Initializes all modules and handles UI tab switching.
+// Entry point. Initializes all modules and handles UI switching.
 
 import { connect, disconnect, isConnected, onConnectionChange } from './connection.js';
 import { initMapViewer } from './map_viewer.js';
@@ -11,11 +11,10 @@ import { initMetrics } from './metrics.js';
 document.addEventListener('DOMContentLoaded', () => {
   console.log('App starting...');
 
-  // Initialize UI components
-  _initTabs();
   _initConnectionUI();
+  _initModeSelector();
+  _initBottomTabs();
 
-  // Initialize modules
   initMapViewer();
   initTeleop();
   initPartitioner();
@@ -58,17 +57,37 @@ function _initConnectionUI() {
   });
 }
 
-function _initTabs() {
-  const tabs = document.querySelectorAll('.tab-btn');
-  const contents = document.querySelectorAll('.tab-content');
+function _initModeSelector() {
+  const modeBtns = document.querySelectorAll('.mode-btn');
+  const modePanels = document.querySelectorAll('.mode-panel');
+
+  modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      modeBtns.forEach(b => b.classList.remove('active'));
+      modePanels.forEach(p => p.classList.remove('active'));
+
+      btn.classList.add('active');
+      const mode = btn.dataset.mode;
+      const panel = document.getElementById(`mode-${mode}`);
+      if (panel) panel.classList.add('active');
+
+      // Trigger resize for partitioner canvas when switching to it
+      if (mode === 'partitioner') {
+        window.dispatchEvent(new Event('resize'));
+      }
+    });
+  });
+}
+
+function _initBottomTabs() {
+  const tabs = document.querySelectorAll('.left-bottom .tab-btn');
+  const contents = document.querySelectorAll('.left-bottom .tab-content');
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      // Remove active class from all
       tabs.forEach(t => t.classList.remove('active'));
       contents.forEach(c => c.classList.remove('active'));
 
-      // Add active class to clicked tab and corresponding content
       tab.classList.add('active');
       const targetId = tab.getAttribute('data-target');
       document.getElementById(targetId).classList.add('active');
