@@ -1,16 +1,16 @@
 // ─── Graph Partitioner Module ───────────────────────────────────────────────
-// BFS region growing with canvas visualization.
+// BFS region growing with canvas visualization, YAML highlighting, fullscreen, robot picker.
 
 import { publish, isConnected } from './connection.js';
 import { TOPICS } from '../config/topics.js';
 
 const COLORS = [
-  '#2196f3','#4caf50','#ff9800','#d2a679','#9c27b0',
-  '#00bcd4','#8bc34a','#ff5722','#e91e63','#795548',
-  '#03a9f4','#cddc39','#ff7043','#f06292','#a1887f',
-  '#4dd0e1','#dce775','#ff8a65','#f48fb1','#bcaaa4'
+  '#0066FF','#FF6600','#3385FF','#CC5200','#66A3FF',
+  '#FF8533','#99C2FF','#E67300','#B3D1FF','#FFB380',
+  '#0052CC','#FF9E40','#1A75FF','#D98600','#4D94FF',
+  '#FF7A1A','#80B3FF','#FFAD5C','#3D8BFF','#FFC699'
 ];
-const SEED_RING = '#f0e68c';
+const SEED_RING = '#FF6600';
 
 // ── YAML parser ──
 function parseYAML(text) {
@@ -39,6 +39,57 @@ function parseYAML(text) {
 function _pv(v) {
   if (v === 'true') return true; if (v === 'false') return false;
   const n = Number(v); return isNaN(n) ? v : n;
+}
+
+// ── YAML Syntax Highlighting ──
+function highlightYAML(text) {
+  return text.split('\n').map(line => {
+    if (!line.trim() || line.trim().startsWith('#')) {
+      return `<span class="yaml-comment">${_esc(line)}</span>`;
+    }
+    // Section headers
+    if (/^(nodes|edges)\s*:/.test(line.trim())) {
+      return `<span class="yaml-key">${_esc(line.replace(/^(nodes|edges)/, '$1'))}</span>`;
+    }
+    // List item with key: value
+    const li = line.match(/^(\s*)(-)\s+(.*)/);
+    if (li) {
+      const indent = _esc(li[1]);
+      const dash = `<span class="yaml-dash">${li[2]}</span>`;
+      const rest = _highlightKV(li[3]);
+      return `${indent}${dash} ${rest}`;
+    }
+    // Key: value (indented)
+    const kv = line.match(/^(\s+)(\w+)\s*:\s*(.*)/);
+    if (kv) {
+      const indent = _esc(kv[1]);
+      const key = `<span class="yaml-key">${_esc(kv[2])}</span>:`;
+      const val = kv[3].trim() ? ` ${_highlightVal(kv[3].trim())}` : '';
+      return `${indent}${key}${val}`;
+    }
+    return _esc(line);
+  }).join('\n');
+}
+
+function _highlightKV(text) {
+  const kv = text.match(/(\w+)\s*:\s*(.*)/);
+  if (kv) {
+    const key = `<span class="yaml-key">${_esc(kv[1])}</span>:`;
+    const val = kv[2].trim() ? ` ${_highlightVal(kv[2].trim())}` : '';
+    return `${key}${val}`;
+  }
+  return _esc(text);
+}
+
+function _highlightVal(v) {
+  if (v === 'true' || v === 'false') return `<span class="yaml-string">${v}</span>`;
+  const n = Number(v);
+  if (!isNaN(n)) return `<span class="yaml-number">${v}</span>`;
+  return `<span class="yaml-string">${_esc(v)}</span>`;
+}
+
+function _esc(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ── MinHeap ──
@@ -194,12 +245,8 @@ let tfm = { x: 0, y: 0, scale: 1 };
 let drag = false, dragStart = {}, tfmStart = {};
 let hoveredNode = null;
 
-function w2s(wx, wy) {
-  return { x: wx * tfm.scale + tfm.x, y: -wy * tfm.scale + tfm.y };
-}
-function s2w(sx, sy) {
-  return { x: (sx - tfm.x) / tfm.scale, y: -(sy - tfm.y) / tfm.scale };
-}
+function w2s(wx, wy) { return { x: wx * tfm.scale + tfm.x, y: -wy * tfm.scale + tfm.y }; }
+function s2w(sx, sy) { return { x: (sx - tfm.x) / tfm.scale, y: -(sy - tfm.y) / tfm.scale }; }
 
 function lighten(hex, a) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -225,13 +272,12 @@ function draw() {
   const r = cv.getBoundingClientRect();
   ctx.clearRect(0, 0, r.width, r.height);
 
-  // Background
-  ctx.fillStyle = '#121212';
+  ctx.fillStyle = '#F5F5F5';
   ctx.fillRect(0, 0, r.width, r.height);
 
   if (!graphData) {
-    ctx.fillStyle = 'rgba(136,136,136,0.25)';
-    ctx.font = '13px "Roboto Mono", monospace';
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.font = '13px Montserrat, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('Enter graph YAML and click Run', r.width / 2, r.height / 2);
     return;
@@ -248,17 +294,17 @@ function draw() {
     const isCut = labels && labels[e.u] !== labels[e.v];
     ctx.beginPath(); ctx.moveTo(pu.x, pu.y); ctx.lineTo(pv.x, pv.y);
     if (isCut) {
-      ctx.strokeStyle = 'rgba(244,67,54,0.55)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,102,0,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
     } else if (labels) {
-      ctx.strokeStyle = COLORS[labels[e.u] % COLORS.length] + '44'; ctx.lineWidth = 2; ctx.setLineDash([]);
+      ctx.strokeStyle = COLORS[labels[e.u] % COLORS.length] + '33'; ctx.lineWidth = 2; ctx.setLineDash([]);
     } else {
-      ctx.strokeStyle = 'rgba(136,136,136,0.2)'; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.setLineDash([]);
     }
     ctx.stroke(); ctx.setLineDash([]);
     if (tfm.scale > 18) {
       const mx2 = (pu.x + pv.x) / 2, my2 = (pu.y + pv.y) / 2;
-      ctx.fillStyle = 'rgba(136,136,136,0.5)';
-      ctx.font = `${Math.min(10, tfm.scale * 0.17)}px "Roboto Mono"`;
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.font = `${Math.min(10, tfm.scale * 0.17)}px Montserrat`;
       ctx.textAlign = 'center';
       ctx.fillText(e.cost, mx2, my2 - 4);
     }
@@ -267,13 +313,13 @@ function draw() {
   const nr = Math.max(7, Math.min(24, tfm.scale * 0.6));
   for (const n of nodes) {
     const p = w2s(n.x, n.y);
-    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#2196f3';
+    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#0066FF';
     const isSeed = seeds.has(n.id);
     const isHov = hoveredNode && hoveredNode.id === n.id;
     const rr = isHov ? nr * 1.25 : nr;
     if (labels) {
       const grd = ctx.createRadialGradient(p.x, p.y, rr * 0.4, p.x, p.y, rr * 3.5);
-      grd.addColorStop(0, col + '30'); grd.addColorStop(1, 'transparent');
+      grd.addColorStop(0, col + '20'); grd.addColorStop(1, 'transparent');
       ctx.beginPath(); ctx.arc(p.x, p.y, rr * 3.5, 0, Math.PI * 2);
       ctx.fillStyle = grd; ctx.fill();
     }
@@ -286,11 +332,11 @@ function draw() {
     const grd2 = ctx.createRadialGradient(p.x - rr * 0.3, p.y - rr * 0.35, 0, p.x, p.y, rr);
     grd2.addColorStop(0, lighten(col, 0.35)); grd2.addColorStop(1, col);
     ctx.fillStyle = grd2; ctx.fill();
-    ctx.strokeStyle = isHov ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.2)';
+    ctx.strokeStyle = isHov ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.08)';
     ctx.lineWidth = isHov ? 2 : 1; ctx.stroke();
     if (rr > 9) {
-      ctx.fillStyle = '#000';
-      ctx.font = `600 ${Math.min(rr * 0.75, 12)}px "Roboto Mono"`;
+      ctx.fillStyle = '#fff';
+      ctx.font = `600 ${Math.min(rr * 0.75, 12)}px Montserrat`;
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(n.id, p.x, p.y);
     }
@@ -338,6 +384,165 @@ function exportPart(p, nodes, edges, labels) {
   return yaml;
 }
 
+// ── YAML highlight updater ──
+function _updateYAMLHighlight() {
+  const ta = document.getElementById('part-yaml');
+  const pre = document.getElementById('yaml-highlight');
+  if (!ta || !pre) return;
+  pre.innerHTML = highlightYAML(ta.value) + '\n';
+}
+
+// ── Fullscreen ──
+let fsGraphCanvas = null, fsGraphCtx = null, fsGraphActive = false;
+let fsYamlActive = false;
+
+function _initFullscreen() {
+  // YAML fullscreen
+  const fsYamlBtn = document.getElementById('part-fs-yaml');
+  if (fsYamlBtn) {
+    fsYamlBtn.addEventListener('click', () => {
+      const overlay = document.getElementById('fs-yaml-overlay');
+      const ta = document.getElementById('fs-yaml-textarea');
+      const src = document.getElementById('part-yaml');
+      if (overlay && ta && src) {
+        ta.value = src.value;
+        overlay.classList.add('active');
+        fsYamlActive = true;
+      }
+    });
+  }
+  const fsYamlClose = document.getElementById('fs-yaml-close');
+  if (fsYamlClose) {
+    fsYamlClose.addEventListener('click', () => {
+      const overlay = document.getElementById('fs-yaml-overlay');
+      const ta = document.getElementById('fs-yaml-textarea');
+      const src = document.getElementById('part-yaml');
+      if (overlay && ta && src) {
+        src.value = ta.value;
+        _updateYAMLHighlight();
+        overlay.classList.remove('active');
+        fsYamlActive = false;
+      }
+    });
+  }
+
+  // Graph fullscreen
+  const fsGraphBtn = document.getElementById('part-fs-graph');
+  if (fsGraphBtn) {
+    fsGraphBtn.addEventListener('click', () => {
+      const overlay = document.getElementById('fs-graph-overlay');
+      if (overlay) {
+        overlay.classList.add('active');
+        fsGraphActive = true;
+        fsGraphCanvas = document.getElementById('fs-graph-canvas');
+        fsGraphCtx = fsGraphCanvas.getContext('2d');
+        _resizeFsGraph();
+      }
+    });
+  }
+  const fsGraphClose = document.getElementById('fs-graph-close');
+  if (fsGraphClose) {
+    fsGraphClose.addEventListener('click', () => {
+      const overlay = document.getElementById('fs-graph-overlay');
+      if (overlay) {
+        overlay.classList.remove('active');
+        fsGraphActive = false;
+      }
+    });
+  }
+  window.addEventListener('resize', () => {
+    if (fsGraphActive) _resizeFsGraph();
+  });
+}
+
+function _resizeFsGraph() {
+  if (!fsGraphCanvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const r = fsGraphCanvas.parentElement.getBoundingClientRect();
+  fsGraphCanvas.width = r.width * dpr;
+  fsGraphCanvas.height = r.height * dpr;
+  fsGraphCanvas.style.width = r.width + 'px';
+  fsGraphCanvas.style.height = r.height + 'px';
+  fsGraphCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // Draw in fullscreen context
+  _drawInContext(fsGraphCtx, fsGraphCanvas.getBoundingClientRect());
+}
+
+function _drawInContext(ctx, r) {
+  ctx.clearRect(0, 0, r.width, r.height);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, r.width, r.height);
+
+  if (!graphData) {
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.font = '16px Montserrat';
+    ctx.textAlign = 'center';
+    ctx.fillText('Run partitioning first', r.width / 2, r.height / 2);
+    return;
+  }
+
+  const { nodes, edges } = graphData;
+  const labels = result ? result.labels : null;
+  const seeds = result ? new Set(result.seeds) : new Set();
+
+  // Fit to fullscreen
+  const pad = 80;
+  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const gw = x1 - x0 || 1, gh = y1 - y0 || 1;
+  const sc = Math.min((r.width - pad * 2) / gw, (r.height - pad * 2) / gh, 100);
+  const ox = r.width / 2 - sc * (x0 + x1) / 2;
+  const oy = r.height / 2 + sc * (y0 + y1) / 2;
+
+  function fw(wx, wy) { return { x: wx * sc + ox, y: -wy * sc + oy }; }
+
+  for (const e of edges) {
+    const nu = nodes.find(n => n.id === e.u), nv = nodes.find(n => n.id === e.v);
+    if (!nu || !nv) continue;
+    const pu = fw(nu.x, nu.y), pv = fw(nv.x, nv.y);
+    const isCut = labels && labels[e.u] !== labels[e.v];
+    ctx.beginPath(); ctx.moveTo(pu.x, pu.y); ctx.lineTo(pv.x, pv.y);
+    if (isCut) { ctx.strokeStyle = 'rgba(255,102,0,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); }
+    else if (labels) { ctx.strokeStyle = COLORS[labels[e.u] % COLORS.length] + '33'; ctx.lineWidth = 3; ctx.setLineDash([]); }
+    else { ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1.5; ctx.setLineDash([]); }
+    ctx.stroke(); ctx.setLineDash([]);
+    const mx2 = (pu.x + pv.x) / 2, my2 = (pu.y + pv.y) / 2;
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.font = `${Math.min(12, sc * 0.15)}px Montserrat`;
+    ctx.textAlign = 'center';
+    ctx.fillText(e.cost, mx2, my2 - 5);
+  }
+
+  const nr = Math.max(10, Math.min(30, sc * 0.5));
+  for (const n of nodes) {
+    const p = fw(n.x, n.y);
+    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#0066FF';
+    const isSeed = seeds.has(n.id);
+    const rr = nr;
+    if (labels) {
+      const grd = ctx.createRadialGradient(p.x, p.y, rr * 0.4, p.x, p.y, rr * 3);
+      grd.addColorStop(0, col + '20'); grd.addColorStop(1, 'transparent');
+      ctx.beginPath(); ctx.arc(p.x, p.y, rr * 3, 0, Math.PI * 2);
+      ctx.fillStyle = grd; ctx.fill();
+    }
+    if (isSeed) {
+      ctx.beginPath(); ctx.arc(p.x, p.y, rr + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = SEED_RING; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
+    const grd2 = ctx.createRadialGradient(p.x - rr * 0.3, p.y - rr * 0.35, 0, p.x, p.y, rr);
+    grd2.addColorStop(0, lighten(col, 0.35)); grd2.addColorStop(1, col);
+    ctx.fillStyle = grd2; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `600 ${Math.min(rr * 0.75, 14)}px Montserrat`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(n.id, p.x, p.y);
+  }
+}
+
 // ── Public API ──
 
 export function initPartitioner() {
@@ -373,7 +578,7 @@ export function initPartitioner() {
     const tip = document.getElementById('part-tooltip');
     if (hit && tip) {
       const p = result ? result.labels[hit.id] : null;
-      const col = p !== null ? COLORS[p % COLORS.length] : '#fff';
+      const col = p !== null ? COLORS[p % COLORS.length] : '#000';
       tip.innerHTML = `<strong style="color:${col}">Node ${hit.id}</strong><br>` +
         (p !== null ? `Partition P${p}<br>` : '') +
         `<span style="color:var(--text-hint)">x: ${hit.x.toFixed(2)}  y: ${hit.y.toFixed(2)}</span>`;
@@ -403,6 +608,18 @@ export function initPartitioner() {
   const runBtn = document.getElementById('part-run-btn');
   if (runBtn) runBtn.addEventListener('click', runPartition);
 
+  // YAML highlight
+  const ta = document.getElementById('part-yaml');
+  if (ta) {
+    ta.addEventListener('input', _updateYAMLHighlight);
+    ta.addEventListener('scroll', () => {
+      const pre = document.getElementById('yaml-highlight');
+      if (pre) pre.scrollTop = ta.scrollTop;
+    });
+    _updateYAMLHighlight();
+  }
+
+  _initFullscreen();
   draw();
 }
 
@@ -445,7 +662,6 @@ export function runPartition() {
       const conn = checkConnected(adj2, res.labels, k);
       fitGraph(nodes); draw();
 
-      // Stats
       let cutC = 0; const seen = new Set();
       for (const e of (edges || [])) {
         const key = `${Math.min(e.u, e.v)},${Math.max(e.u, e.v)}`;
@@ -457,7 +673,7 @@ export function runPartition() {
       _updateEl('part-s-cut', cutC.toFixed(1));
       _showEl('part-stats');
 
-      // Legend — directly into #part-legend
+      // Legend
       const partMap = {};
       for (const [id, p] of Object.entries(res.labels)) {
         partMap[p] = partMap[p] || []; partMap[p].push(id);
@@ -477,20 +693,20 @@ export function runPartition() {
             <span class="part-name" style="color:${COLORS[p % COLORS.length]}">P${p}</span>
             <span class="part-nodes">${ns.sort((a, b) => a - b).join(', ')}</span>
             <span class="part-count">${ns.length}n · ${pct}%</span>
-            <span class="part-conn ${conn[p] ? 'ok' : 'bad'}">${conn[p] ? '✓' : '✗'}</span>`;
+            <span class="part-conn ${conn[p] ? 'ok' : 'bad'}">${conn[p] ? 'ok' : 'disc'}</span>`;
           legendEl.appendChild(div);
         }
       }
       _showEl('part-legend');
 
-      // Export + Deploy — directly into #part-export
+      // Export + Deploy with robot picker
       const exportEl = document.getElementById('part-export');
       if (exportEl) {
         exportEl.innerHTML = '';
         for (let p = 0; p < k; p++) {
           const dlBtn = document.createElement('button');
           dlBtn.className = 'btn-export';
-          dlBtn.innerHTML = `<span class="swatch" style="background:${COLORS[p % COLORS.length]}"></span>Download P${p}`;
+          dlBtn.innerHTML = `<span class="swatch" style="background:${COLORS[p % COLORS.length]}"></span>P${p}.yaml`;
           dlBtn.onclick = () => {
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
             const blob = new Blob([yamlOut], { type: 'text/yaml' });
@@ -499,30 +715,47 @@ export function runPartition() {
           };
           exportEl.appendChild(dlBtn);
 
+          // Deploy with robot selector
+          const deployWrap = document.createElement('span');
+          deployWrap.style.display = 'inline-flex';
+          deployWrap.style.alignItems = 'center';
+          deployWrap.style.gap = '3px';
+
+          const sel = document.createElement('select');
+          sel.className = 'deploy-select';
+          sel.innerHTML = '<option value="robot1">R1</option><option value="robot2">R2</option>';
+
           const deployBtn = document.createElement('button');
           deployBtn.className = 'btn-deploy';
-          const robotKey = p === 0 ? 'robot1' : 'robot2';
-          deployBtn.textContent = `Deploy P${p} → ${robotKey}`;
+          deployBtn.textContent = `Deploy P${p}`;
           deployBtn.onclick = () => {
             if (!isConnected()) { alert('Not connected to rosbridge'); return; }
+            const robotKey = sel.value;
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
             const topic = TOPICS[robotKey]?.graph;
             if (topic) {
               publish(topic, 'std_msgs/String', { data: yamlOut });
-              deployBtn.textContent = '✓ Sent!';
-              setTimeout(() => { deployBtn.textContent = `Deploy P${p} → ${robotKey}`; }, 2000);
+              deployBtn.textContent = 'Sent!';
+              setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
             }
           };
-          exportEl.appendChild(deployBtn);
+
+          deployWrap.appendChild(sel);
+          deployWrap.appendChild(deployBtn);
+          exportEl.appendChild(deployWrap);
         }
       }
       _showEl('part-export');
 
       const allConn = conn.every(Boolean);
       if (hud) {
-        hud.textContent = `partitioned · k=${k} · ${allConn ? 'all connected ✓' : 'check connectivity ⚠'}`;
+        hud.textContent = `k=${k} · ${allConn ? 'all connected' : 'check connectivity'}`;
         hud.className = 'part-hud' + (allConn ? ' active' : '');
       }
+
+      // Update fullscreen graph if open
+      if (fsGraphActive) _resizeFsGraph();
+
     } catch (err) {
       _showPartErr('Error: ' + err.message);
       if (hud) hud.textContent = 'error';

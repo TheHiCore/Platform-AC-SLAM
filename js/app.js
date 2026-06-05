@@ -1,25 +1,19 @@
 // ─── App Initialization Module ──────────────────────────────────────────────
-// Entry point. Initializes all modules and handles UI switching.
 
 import { connect, disconnect, isConnected, onConnectionChange } from './connection.js';
 import { initMapViewer } from './map_viewer.js';
 import { initTeleop } from './teleop.js';
 import { initPartitioner } from './partitioner.js';
-import { initParameters } from './parameters.js';
-import { initMetrics } from './metrics.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log('App starting...');
-
   _initConnectionUI();
   _initModeSelector();
-  _initBottomTabs();
-
+  _initResizeHandle();
+  _initMissionTime();
   initMapViewer();
   initTeleop();
   initPartitioner();
-  initParameters();
-  initMetrics();
 });
 
 function _initConnectionUI() {
@@ -65,32 +59,57 @@ function _initModeSelector() {
     btn.addEventListener('click', () => {
       modeBtns.forEach(b => b.classList.remove('active'));
       modePanels.forEach(p => p.classList.remove('active'));
-
       btn.classList.add('active');
       const mode = btn.dataset.mode;
       const panel = document.getElementById(`mode-${mode}`);
       if (panel) panel.classList.add('active');
-
-      // Trigger resize for partitioner canvas when switching to it
-      if (mode === 'partitioner') {
-        window.dispatchEvent(new Event('resize'));
-      }
+      if (mode === 'partitioner') window.dispatchEvent(new Event('resize'));
     });
   });
 }
 
-function _initBottomTabs() {
-  const tabs = document.querySelectorAll('.left-bottom .tab-btn');
-  const contents = document.querySelectorAll('.left-bottom .tab-content');
+function _initResizeHandle() {
+  const handle = document.getElementById('resize-handle');
+  const leftPanel = document.getElementById('left-panel');
+  if (!handle || !leftPanel) return;
 
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      contents.forEach(c => c.classList.remove('active'));
+  let isResizing = false;
 
-      tab.classList.add('active');
-      const targetId = tab.getAttribute('data-target');
-      document.getElementById(targetId).classList.add('active');
-    });
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    isResizing = true;
+    handle.classList.add('active');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
   });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    const newWidth = Math.max(280, Math.min(700, e.clientX));
+    leftPanel.style.width = newWidth + 'px';
+    window.dispatchEvent(new Event('resize'));
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      handle.classList.remove('active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+  });
+}
+
+let missionStartTime = null;
+let missionInterval = null;
+
+function _initMissionTime() {
+  missionStartTime = Date.now();
+  missionInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - missionStartTime) / 1000);
+    const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
+    const s = (elapsed % 60).toString().padStart(2, '0');
+    const el = document.getElementById('mission-time');
+    if (el) el.textContent = `${m}:${s}`;
+  }, 1000);
 }

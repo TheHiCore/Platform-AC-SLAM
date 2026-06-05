@@ -1,27 +1,24 @@
 // ─── Map Viewer Module ──────────────────────────────────────────────────────
-// Subscribes to OccupancyGrid topics, renders on canvas, overlays robot pose.
-// New layout: one big canvas (swappable), three thumbnail canvases, right-click rotation.
+// Subscribes to OccupancyGrid topics, renders on canvas.
+// RViz-style rotation (right-click orbit), no pose overlay.
 
 import { subscribe, onConnectionChange } from './connection.js';
 import { TOPICS } from '../config/topics.js';
 
 const MAP_NAMES = {
-  robot1: { topic: TOPICS.robot1.map, pose: TOPICS.robot1.pose, label: 'Robot 1 Map' },
-  robot2: { topic: TOPICS.robot2.map, pose: TOPICS.robot2.pose, label: 'Robot 2 Map' },
-  merged: { topic: TOPICS.mergedMap, pose: null, label: 'Merged Global Map' },
+  robot1: { topic: TOPICS.robot1.map, label: 'Robot 1 Map' },
+  robot2: { topic: TOPICS.robot2.map, label: 'Robot 2 Map' },
+  merged: { topic: TOPICS.mergedMap, label: 'Merged Global Map' },
 };
 
 class MapData {
   constructor(key) {
     this.key = key;
     this.topicName = MAP_NAMES[key].topic;
-    this.poseTopicName = MAP_NAMES[key].pose;
     this.label = MAP_NAMES[key].label;
     this.mapMeta = null;
     this.mapImage = null;
-    this.pose = null;
     this.mapSub = null;
-    this.poseSub = null;
   }
 
   subscribeTo() {
@@ -30,18 +27,10 @@ class MapData {
       this._processMap(msg);
       mapViewer.onMapUpdate(this.key);
     }, { throttleRate: 500 });
-
-    if (this.poseTopicName) {
-      this.poseSub = subscribe(this.poseTopicName, 'geometry_msgs/PoseWithCovarianceStamped', (msg) => {
-        this.pose = msg.pose.pose;
-        mapViewer.onMapUpdate(this.key);
-      }, { throttleRate: 200 });
-    }
   }
 
   unsubscribe() {
     if (this.mapSub) { this.mapSub.unsubscribe(); this.mapSub = null; }
-    if (this.poseSub) { this.poseSub.unsubscribe(); this.poseSub = null; }
   }
 
   _processMap(msg) {
@@ -59,20 +48,20 @@ class MapData {
       const val = data[i];
       const idx = i * 4;
       if (val === -1) {
-        imgData.data[idx]     = 40;
-        imgData.data[idx + 1] = 44;
-        imgData.data[idx + 2] = 52;
+        imgData.data[idx]     = 200;
+        imgData.data[idx + 1] = 200;
+        imgData.data[idx + 2] = 200;
         imgData.data[idx + 3] = 255;
       } else if (val === 0) {
-        imgData.data[idx]     = 22;
-        imgData.data[idx + 1] = 27;
-        imgData.data[idx + 2] = 34;
+        imgData.data[idx]     = 245;
+        imgData.data[idx + 1] = 245;
+        imgData.data[idx + 2] = 245;
         imgData.data[idx + 3] = 255;
       } else {
         const intensity = Math.min(val / 100, 1);
-        imgData.data[idx]     = Math.floor(88 + intensity * 167);
-        imgData.data[idx + 1] = Math.floor(166 - intensity * 100);
-        imgData.data[idx + 2] = Math.floor(255 - intensity * 180);
+        imgData.data[idx]     = Math.floor(30 + intensity * 30);
+        imgData.data[idx + 1] = Math.floor(30 + intensity * 30);
+        imgData.data[idx + 2] = Math.floor(30 + intensity * 60);
         imgData.data[idx + 3] = 255;
       }
     }
@@ -91,18 +80,21 @@ const mapViewer = {
   thumbCanvases: {},
   thumbCtxs: {},
 
-  // Interaction state (per-map transforms stored here)
+  // Per-map transforms with rotation
   transforms: {
     robot1: { x: 0, y: 0, scale: 1, rotation: 0 },
     robot2: { x: 0, y: 0, scale: 1, rotation: 0 },
     merged: { x: 0, y: 0, scale: 1, rotation: 0 },
   },
+
+  // Interaction state
   isDragging: false,
   isRotating: false,
   dragStart: { x: 0, y: 0 },
   transformStart: null,
-  rotationStart: 0,
-  rotMouseStart: 0,
+  rotationCenter: { x: 0, y: 0 },
+  rotationStartAngle: 0,
+  mouseStartAngle: 0,
   firstMapReceived: { robot1: false, robot2: false, merged: false },
 
   rotationBadge: null,
@@ -126,7 +118,6 @@ const mapViewer = {
       }
     }
 
-    // Init data sources
     for (const key of Object.keys(MAP_NAMES)) {
       this.dataSources[key] = new MapData(key);
     }
@@ -149,45 +140,45 @@ const mapViewer = {
     document.querySelectorAll('.map-thumb').forEach(el => {
       el.addEventListener('click', () => {
         const key = el.dataset.map;
-        if (key && key !== this.activeKey) {
-          this.switchActive(key);
-        }
+        if (key && key !== this.activeKey) this.switchActive(key);
       });
     });
   },
 
   switchActive(key) {
     this.activeKey = key;
-
-    // Update thumb active states
     document.querySelectorAll('.map-thumb').forEach(el => {
       el.classList.toggle('active', el.dataset.map === key);
     });
-
-    // Update header
     const header = document.getElementById('map-big-header');
     if (header) header.textContent = MAP_NAMES[key].label;
-
     this._resize();
   },
 
   _initBigCanvasInteraction() {
     const cv = this.bigCanvas;
-
-    cv.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+    cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
     cv.addEventListener('mousedown', (e) => {
       const r = cv.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+
       if (e.button === 2) {
-        // Right-click: rotation
+        // RViz-style rotation: orbit around center of current view
         this.isRotating = true;
-        this.rotMouseStart = e.clientX - r.left;
-        this.rotationStart = this.transforms[this.activeKey].rotation;
+        const tfm = this.transforms[this.activeKey];
+
+        // Rotation center = center of the visible area
+        this.rotationCenter = { x: r.width / 2, y: r.height / 2 };
+
+        // Angle from center to mouse
+        this.mouseStartAngle = Math.atan2(my - this.rotationCenter.y, mx - this.rotationCenter.x);
+        this.rotationStartAngle = tfm.rotation * Math.PI / 180;
         cv.style.cursor = 'crosshair';
       } else if (e.button === 0) {
-        // Left-click: pan
         this.isDragging = true;
-        this.dragStart = { x: e.clientX - r.left, y: e.clientY - r.top };
+        this.dragStart = { x: mx, y: my };
         this.transformStart = { ...this.transforms[this.activeKey] };
         cv.style.cursor = 'grabbing';
       }
@@ -199,11 +190,16 @@ const mapViewer = {
       const my = e.clientY - r.top;
 
       if (this.isRotating) {
-        const dx = mx - this.rotMouseStart;
-        const deltaDeg = dx * 0.3;
-        const newRot = this.rotationStart + deltaDeg;
-        this.transforms[this.activeKey].rotation = newRot;
-        this._showRotationBadge(newRot);
+        const currentAngle = Math.atan2(my - this.rotationCenter.y, mx - this.rotationCenter.x);
+        let deltaAngle = currentAngle - this.mouseStartAngle;
+        // Normalize to [-PI, PI]
+        while (deltaAngle > Math.PI) deltaAngle -= 2 * Math.PI;
+        while (deltaAngle < -Math.PI) deltaAngle += 2 * Math.PI;
+
+        const newRad = this.rotationStartAngle + deltaAngle;
+        const newDeg = newRad * 180 / Math.PI;
+        this.transforms[this.activeKey].rotation = newDeg;
+        this._showRotationBadge(newDeg);
         this._drawBig();
       } else if (this.isDragging) {
         this.transforms[this.activeKey].x = this.transformStart.x + (mx - this.dragStart.x);
@@ -237,7 +233,6 @@ const mapViewer = {
       const factor = e.deltaY > 0 ? 0.85 : 1.18;
       const tfm = this.transforms[this.activeKey];
 
-      // Account for rotation: un-rotate the mouse position to get world coords
       const rad = tfm.rotation * Math.PI / 180;
       const cosR = Math.cos(-rad), sinR = Math.sin(-rad);
       const relX = mx - tfm.x, relY = my - tfm.y;
@@ -246,7 +241,6 @@ const mapViewer = {
 
       tfm.scale = Math.max(0.1, Math.min(50, tfm.scale * factor));
 
-      // Recalculate position to keep world point under mouse
       const newRelX = wx * tfm.scale, newRelY = wy * tfm.scale;
       const rotNewX = newRelX * Math.cos(rad) - newRelY * Math.sin(rad);
       const rotNewY = newRelX * Math.sin(rad) + newRelY * Math.cos(rad);
@@ -274,7 +268,6 @@ const mapViewer = {
   },
 
   _resize() {
-    // Resize big canvas
     const dpr = window.devicePixelRatio || 1;
     const r = this.bigCanvas.parentElement.getBoundingClientRect();
     this.bigCanvas.width = r.width * dpr;
@@ -283,7 +276,6 @@ const mapViewer = {
     this.bigCanvas.style.height = r.height + 'px';
     this.bigCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    // Resize thumbnails
     for (const key of Object.keys(this.thumbCanvases)) {
       const tc = this.thumbCanvases[key];
       if (!tc) continue;
@@ -304,9 +296,7 @@ const mapViewer = {
       this.firstMapReceived[key] = true;
       this._fitMap(key);
     }
-    if (key === this.activeKey) {
-      this._drawBig();
-    }
+    if (key === this.activeKey) this._drawBig();
     this._drawThumbnail(key);
   },
 
@@ -315,7 +305,6 @@ const mapViewer = {
     if (!src || !src.mapMeta) return;
     const info = src.mapMeta;
     const tfm = this.transforms[key];
-
     const r = this.bigCanvas.getBoundingClientRect();
     const padding = 20;
     const scaleX = (r.width - padding * 2) / (info.width * info.resolution);
@@ -332,13 +321,12 @@ const mapViewer = {
     const r = cv.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
 
-    // Background
-    ctx.fillStyle = '#121212';
+    ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, 0, r.width, r.height);
 
     // Grid
     const tfm = this.transforms[this.activeKey];
-    ctx.strokeStyle = 'rgba(68,68,68,0.3)';
+    ctx.strokeStyle = 'rgba(0,0,0,0.05)';
     ctx.lineWidth = 0.5;
     const gridSize = 40;
     for (let x = tfm.x % gridSize; x < r.width; x += gridSize) {
@@ -350,8 +338,8 @@ const mapViewer = {
 
     const src = this.dataSources[this.activeKey];
     if (!src || !src.mapImage || !src.mapMeta) {
-      ctx.fillStyle = 'rgba(136,136,136,0.3)';
-      ctx.font = '13px "Roboto Mono", monospace';
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.font = '13px Montserrat, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Waiting for map data...', r.width / 2, r.height / 2);
       return;
@@ -365,7 +353,6 @@ const mapViewer = {
     ctx.save();
     ctx.translate(tfm.x, tfm.y);
 
-    // Apply rotation around center of map
     if (tfm.rotation !== 0) {
       const cx = mapW / 2, cy = mapH / 2;
       ctx.translate(cx, cy);
@@ -375,39 +362,6 @@ const mapViewer = {
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src.mapImage, 0, 0, mapW, mapH);
-
-    // Draw robot pose arrow
-    if (src.pose) {
-      const px = (src.pose.position.x - info.origin.position.x) * scale;
-      const py = mapH - (src.pose.position.y - info.origin.position.y) * scale;
-
-      const q = src.pose.orientation;
-      const yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
-
-      const arrowLen = Math.max(12, scale * 0.8);
-
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(-yaw);
-
-      ctx.shadowColor = '#2196f3';
-      ctx.shadowBlur = 12;
-
-      ctx.beginPath();
-      ctx.moveTo(arrowLen, 0);
-      ctx.lineTo(-arrowLen * 0.5, -arrowLen * 0.5);
-      ctx.lineTo(-arrowLen * 0.2, 0);
-      ctx.lineTo(-arrowLen * 0.5, arrowLen * 0.5);
-      ctx.closePath();
-      ctx.fillStyle = '#2196f3';
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      ctx.shadowBlur = 0;
-      ctx.restore();
-    }
 
     ctx.restore();
   },
@@ -422,16 +376,15 @@ const mapViewer = {
     const tc = this.thumbCanvases[key];
     const ctx = this.thumbCtxs[key];
     if (!tc || !ctx) return;
-
     const r = tc.getBoundingClientRect();
     ctx.clearRect(0, 0, r.width, r.height);
-    ctx.fillStyle = '#121212';
+    ctx.fillStyle = '#F5F5F5';
     ctx.fillRect(0, 0, r.width, r.height);
 
     const src = this.dataSources[key];
     if (!src || !src.mapImage || !src.mapMeta) {
-      ctx.fillStyle = 'rgba(136,136,136,0.2)';
-      ctx.font = '10px "Roboto Mono", monospace';
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.font = '10px Montserrat, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('No data', r.width / 2, r.height / 2);
       return;
@@ -442,7 +395,6 @@ const mapViewer = {
     const scaleX = (r.width - padding * 2) / (info.width * info.resolution);
     const scaleY = (r.height - padding * 2) / (info.height * info.resolution);
     const scale = Math.min(scaleX, scaleY);
-
     const mapW = info.width * info.resolution * scale;
     const mapH = info.height * info.resolution * scale;
     const ox = (r.width - mapW) / 2;
@@ -450,28 +402,6 @@ const mapViewer = {
 
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(src.mapImage, ox, oy, mapW, mapH);
-
-    // Mini pose arrow
-    if (src.pose) {
-      const px = ox + (src.pose.position.x - info.origin.position.x) * scale;
-      const py = oy + mapH - (src.pose.position.y - info.origin.position.y) * scale;
-
-      const q = src.pose.orientation;
-      const yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
-      const arrowLen = 6;
-
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(-yaw);
-      ctx.beginPath();
-      ctx.moveTo(arrowLen, 0);
-      ctx.lineTo(-arrowLen * 0.5, -arrowLen * 0.5);
-      ctx.lineTo(-arrowLen * 0.5, arrowLen * 0.5);
-      ctx.closePath();
-      ctx.fillStyle = '#2196f3';
-      ctx.fill();
-      ctx.restore();
-    }
   },
 };
 
