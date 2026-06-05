@@ -619,8 +619,76 @@ export function initPartitioner() {
     _updateYAMLHighlight();
   }
 
+  // Clear logs button
+  const clearBtn = document.getElementById('btn-clear-logs');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      const outputBox = document.getElementById('part-terminal-output');
+      if (outputBox) outputBox.textContent = '';
+    });
+  }
+
+  // Stop Node button
+  const stopBtn = document.getElementById('btn-stop-node');
+  if (stopBtn) {
+    stopBtn.addEventListener('click', async () => {
+      if (!currentLogRobot) return;
+      try {
+        await fetch('/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ robot: currentLogRobot })
+        });
+        stopBtn.style.display = 'none';
+        if (logEventSource) {
+          logEventSource.close();
+          logEventSource = null;
+        }
+        const outputBox = document.getElementById('part-terminal-output');
+        if (outputBox) outputBox.textContent += `\n--- Node for ${currentLogRobot} stopped by user ---\n`;
+        currentLogRobot = null;
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+
   _initFullscreen();
   draw();
+}
+
+let logEventSource = null;
+let currentLogRobot = null;
+
+function startLogStream(robotKey) {
+  currentLogRobot = robotKey;
+  const targetLabel = document.getElementById('log-robot-target');
+  const outputBox = document.getElementById('part-terminal-output');
+  const stopBtn = document.getElementById('btn-stop-node');
+  
+  if (!outputBox) return;
+
+  if (targetLabel) targetLabel.textContent = `(${robotKey})`;
+  outputBox.textContent = `--- Connecting to logs for ${robotKey} ---\n`;
+  if (stopBtn) stopBtn.style.display = 'inline-block';
+
+  if (logEventSource) {
+    logEventSource.close();
+  }
+
+  logEventSource = new EventSource(`/logs?robot=${robotKey}`);
+  
+  logEventSource.onmessage = (e) => {
+    outputBox.textContent += e.data + '\n';
+    outputBox.scrollTop = outputBox.scrollHeight;
+  };
+  
+  logEventSource.onerror = (err) => {
+    outputBox.textContent += `\n--- Stream finished or disconnected ---\n`;
+    if (stopBtn && currentLogRobot === robotKey) stopBtn.style.display = 'none';
+    logEventSource.close();
+    logEventSource = null;
+  };
 }
 
 export function runPartition() {
@@ -728,15 +796,28 @@ export function runPartition() {
           const deployBtn = document.createElement('button');
           deployBtn.className = 'btn-deploy';
           deployBtn.textContent = `Deploy P${p}`;
-          deployBtn.onclick = () => {
-            if (!isConnected()) { alert('Not connected to rosbridge'); return; }
+          deployBtn.onclick = async () => {
             const robotKey = sel.value;
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
-            const topic = TOPICS[robotKey]?.graph;
-            if (topic) {
-              publish(topic, 'std_msgs/String', { data: yamlOut });
-              deployBtn.textContent = 'Sent!';
+            
+            deployBtn.textContent = 'Sending...';
+            try {
+              const res = await fetch('/launch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ robot: robotKey, yaml: yamlOut })
+              });
+              if (!res.ok) throw new Error('Backend error ' + res.status);
+              
+              deployBtn.textContent = 'Launched!';
               setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
+              
+              startLogStream(robotKey);
+            } catch (err) {
+              console.error(err);
+              deployBtn.textContent = 'Failed';
+              setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
+              alert("Ensure server.py is running! Error: " + err.message);
             }
           };
 

@@ -1,140 +1,174 @@
 // ─── Teleop Module ──────────────────────────────────────────────────────────
-// 8-directional toggle buttons, holonomic switch, click-once to move, center to stop.
+// Exact emulation of teleop_twist_keyboard.py
 
 import { publish, isConnected } from './connection.js';
 import { TOPICS } from '../config/topics.js';
 
 let selectedRobot = 'robot1';
-let speed = 0.2;
-let angularSpeed = 0.5;
-let holonomic = { robot1: false, robot2: true }; // R1 default non-holonomic, R2 default holonomic
 
-// Active directions (toggle-on-click style)
-let activeDirs = new Set();
+// Robot state
+let x = 0;
+let y = 0;
+let z = 0;
+let th = 0;
+let speed = 0.5;
+let turn = 1.0;
+const speedLimit = 1000.0;
+const turnLimit = 1000.0;
 
-// Button mapping: direction -> Twist components
-// Each entry: [linearX, linearY, angularZ] multipliers
-const DIR_MAP = {
-  n:  [ 1,  0,  0],
-  ne: [ 1,  1, -1],
-  e:  [ 0,  1, -1],
-  se: [-1,  1, -1],
-  s:  [-1,  0,  0],
-  sw: [-1, -1,  1],
-  w:  [ 0, -1,  1],
-  nw: [ 1, -1,  1],
+let publishInterval = null;
+
+const moveBindings = {
+  'i': [ 1,  0,  0,  0],
+  'o': [ 1,  0,  0, -1],
+  'j': [ 0,  0,  0,  1],
+  'l': [ 0,  0,  0, -1],
+  'u': [ 1,  0,  0,  1],
+  ',': [-1,  0,  0,  0],
+  '.': [-1,  0,  0,  1],
+  'm': [-1,  0,  0, -1],
+  'O': [ 1, -1,  0,  0],
+  'I': [ 1,  0,  0,  0],
+  'J': [ 0,  1,  0,  0],
+  'L': [ 0, -1,  0,  0],
+  'U': [ 1,  1,  0,  0],
+  '<': [-1,  0,  0,  0],
+  '>': [-1, -1,  0,  0],
+  'M': [-1,  1,  0,  0],
+  't': [ 0,  0,  1,  0],
+  'b': [ 0,  0, -1,  0],
+};
+
+const speedBindings = {
+  'q': [1.1, 1.1],
+  'z': [0.9, 0.9],
+  'w': [1.1, 1.0],
+  'x': [0.9, 1.0],
+  'e': [1.0, 1.1],
+  'c': [1.0, 0.9],
+};
+
+// Map HTML buttons to keys
+const btnToKey = {
+  'n': 'i',
+  'ne': 'o',
+  'e': 'l',
+  'se': 'm',
+  's': ',',
+  'sw': '.',
+  'w': 'j',
+  'nw': 'u',
+  'stop': 'k'
 };
 
 export function initTeleop() {
-  const slider = document.getElementById('teleop-speed');
-  const speedLabel = document.getElementById('teleop-speed-val');
-  if (slider) {
-    slider.addEventListener('input', () => {
-      speed = parseFloat(slider.value);
-      speedLabel.textContent = speed.toFixed(2);
-    });
-  }
-
-  const angSlider = document.getElementById('teleop-angular-speed');
-  const angLabel = document.getElementById('teleop-angular-speed-val');
-  if (angSlider) {
-    angSlider.addEventListener('input', () => {
-      angularSpeed = parseFloat(angSlider.value);
-      angLabel.textContent = angularSpeed.toFixed(2);
-    });
-  }
-
   const selector = document.getElementById('teleop-robot');
   if (selector) {
     selector.addEventListener('change', () => {
       selectedRobot = selector.value;
-      _updateHolonomicUI();
       _updateRobotIndicator();
-      _updateButtonStates();
+      x = 0; y = 0; z = 0; th = 0; // stop moving when switching robots
     });
   }
 
-  // Direction buttons (toggle on click)
-  Object.keys(DIR_MAP).forEach(dir => {
-    const btn = document.getElementById(`btn-${dir}`);
+  // Keyboard events
+  document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    const holonomicActive = e.getModifierState('CapsLock') || e.shiftKey;
+    _updateHolonomicUI(holonomicActive);
+
+    const key = e.key;
+
+    if (moveBindings[key]) {
+      e.preventDefault();
+      x = moveBindings[key][0];
+      y = moveBindings[key][1];
+      z = moveBindings[key][2];
+      th = moveBindings[key][3];
+      _updateActiveButton(key.toLowerCase());
+    } else if (speedBindings[key.toLowerCase()]) {
+      e.preventDefault();
+      const binding = speedBindings[key.toLowerCase()];
+      speed = Math.min(speedLimit, speed * binding[0]);
+      turn = Math.min(turnLimit, turn * binding[1]);
+      _updateSliders();
+    } else {
+      // Anything else = stop
+      x = 0; y = 0; z = 0; th = 0;
+      _updateActiveButton('k');
+    }
+  });
+
+  document.addEventListener('keyup', (e) => {
+    const holonomicActive = e.getModifierState('CapsLock') || e.shiftKey;
+    _updateHolonomicUI(holonomicActive);
+  });
+
+  // UI Button events
+  Object.keys(btnToKey).forEach(btnDir => {
+    const btn = document.getElementById(`btn-${btnDir}`);
     if (!btn) return;
+    
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      _toggleDir(dir);
+      let key = btnToKey[btnDir];
+      
+      // If holonomic is toggled on via UI or CapsLock, use uppercase for movement
+      const track = document.getElementById('holonomic-switch');
+      const isHolonomic = track && track.classList.contains('on');
+      if (isHolonomic && key !== 'k' && key !== ',' && key !== '.') {
+        key = key.toUpperCase();
+      } else if (isHolonomic && key === ',') { key = '<'; }
+      else if (isHolonomic && key === '.') { key = '>'; }
+
+      if (key === 'k') {
+        x = 0; y = 0; z = 0; th = 0;
+      } else if (moveBindings[key]) {
+        x = moveBindings[key][0];
+        y = moveBindings[key][1];
+        z = moveBindings[key][2];
+        th = moveBindings[key][3];
+      }
+      _updateActiveButton(btnToKey[btnDir]);
     });
   });
 
-  // Stop button (always stops)
-  const stopBtn = document.getElementById('btn-stop');
-  if (stopBtn) {
-    stopBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      _stopAll();
-    });
-  }
-
-  // Holonomic switch
+  // Holonomic switch click
   const hSwitch = document.getElementById('holonomic-switch');
   if (hSwitch) {
     hSwitch.addEventListener('click', () => {
-      holonomic[selectedRobot] = !holonomic[selectedRobot];
-      _updateHolonomicUI();
-      _publishFromActive();
+      const isOn = hSwitch.classList.contains('on');
+      _updateHolonomicUI(!isOn);
     });
   }
 
-  _updateHolonomicUI();
   _updateRobotIndicator();
-  _updateButtonStates();
-}
+  _updateSliders();
 
-function _toggleDir(dir) {
-  if (activeDirs.has(dir)) {
-    activeDirs.delete(dir);
-  } else {
-    activeDirs.add(dir);
+  if (!publishInterval) {
+    publishInterval = setInterval(() => {
+      _publishCurrentVel();
+    }, 100);
   }
-  _updateButtonStates();
-  _publishFromActive();
 }
 
-function _stopAll() {
-  activeDirs.clear();
-  _updateButtonStates();
-  _publishVel(0, 0, 0);
-}
-
-function _publishFromActive() {
-  let linX = 0, linY = 0, angZ = 0;
-  const isHolonomic = holonomic[selectedRobot];
-
-  for (const dir of activeDirs) {
-    const [mx, my, mz] = DIR_MAP[dir];
-    linX += mx;
-    if (isHolonomic) {
-      linY += my;
-    } else {
-      angZ += my; // non-holonomic: Y component becomes angular
-    }
-    angZ += mz;
-  }
-
-  // Apply speeds
-  const vx = linX * speed;
-  const vy = isHolonomic ? linY * speed : 0;
-  const wz = angZ * angularSpeed;
-
-  _publishVel(vx, vy, wz);
-}
-
-function _publishVel(linearX, linearY, angularZ) {
+function _publishCurrentVel() {
   if (!isConnected()) return;
   const topic = TOPICS[selectedRobot]?.cmdVel;
   if (!topic) return;
+
+  const linearX = x * speed;
+  const linearY = y * speed;
+  const linearZ = z * speed;
+  const angularZ = th * turn;
+
   publish(topic, 'geometry_msgs/Twist', {
-    linear: { x: linearX, y: linearY, z: 0 },
+    linear:  { x: linearX, y: linearY, z: linearZ },
     angular: { x: 0, y: 0, z: angularZ },
   });
+
+  // Visual feedback
   const lxEl = document.getElementById('vel-lin-x');
   const lyEl = document.getElementById('vel-lin-y');
   const azEl = document.getElementById('vel-ang-z');
@@ -143,27 +177,31 @@ function _publishVel(linearX, linearY, angularZ) {
   if (azEl) azEl.textContent = angularZ.toFixed(2);
 }
 
-function _updateButtonStates() {
-  Object.keys(DIR_MAP).forEach(dir => {
-    const btn = document.getElementById(`btn-${dir}`);
-    if (btn) btn.classList.toggle('active', activeDirs.has(dir));
+function _updateActiveButton(activeKey) {
+  // Clear all
+  Object.keys(btnToKey).forEach(btnDir => {
+    const btn = document.getElementById(`btn-${btnDir}`);
+    if (btn) btn.classList.remove('active');
   });
-  const stopBtn = document.getElementById('btn-stop');
-  if (stopBtn) stopBtn.classList.toggle('active', activeDirs.size === 0);
+
+  // Set active
+  const targetBtnDir = Object.keys(btnToKey).find(k => btnToKey[k] === activeKey);
+  if (targetBtnDir) {
+    const btn = document.getElementById(`btn-${targetBtnDir}`);
+    if (btn) btn.classList.add('active');
+  }
 }
 
-function _updateHolonomicUI() {
-  const isHolonomic = holonomic[selectedRobot];
-  const track = document.getElementById('holonomic-switch');
-  const labelOff = document.getElementById('holonomic-label');
-  const labelOn = document.getElementById('holonomic-label-on');
+function _updateSliders() {
+  const speedLabel = document.getElementById('teleop-speed-val');
+  const slider = document.getElementById('teleop-speed');
+  if (speedLabel) speedLabel.textContent = speed.toFixed(2);
+  if (slider) slider.value = speed;
 
-  if (track) track.classList.toggle('on', isHolonomic);
-  if (labelOff) labelOff.style.display = isHolonomic ? 'none' : '';
-  if (labelOn) labelOn.style.display = isHolonomic ? '' : 'none';
-
-  // Recalculate if directions are active
-  if (activeDirs.size > 0) _publishFromActive();
+  const angLabel = document.getElementById('teleop-angular-speed-val');
+  const angSlider = document.getElementById('teleop-angular-speed');
+  if (angLabel) angLabel.textContent = turn.toFixed(2);
+  if (angSlider) angSlider.value = turn;
 }
 
 function _updateRobotIndicator() {
@@ -174,9 +212,23 @@ function _updateRobotIndicator() {
   }
 }
 
+function _updateHolonomicUI(isHolonomic) {
+  const track = document.getElementById('holonomic-switch');
+  const labelOff = document.getElementById('holonomic-label');
+  const labelOn = document.getElementById('holonomic-label-on');
+
+  if (track) track.classList.toggle('on', isHolonomic);
+  if (labelOff) labelOff.style.display = isHolonomic ? 'none' : '';
+  if (labelOn) labelOn.style.display = isHolonomic ? '' : 'none';
+}
+
 export function getSelectedRobot() { return selectedRobot; }
-export function isHolonomic() { return holonomic[selectedRobot]; }
+// Holonomic boolean getter removed as logic now entirely driven by moveBindings mapping.
 
 export function destroyTeleop() {
-  activeDirs.clear();
+  if (publishInterval) {
+    clearInterval(publishInterval);
+    publishInterval = null;
+  }
+  x = 0; y = 0; z = 0; th = 0;
 }

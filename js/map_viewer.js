@@ -44,25 +44,34 @@ class MapData {
     const offCtx = offCanvas.getContext('2d');
     const imgData = offCtx.createImageData(info.width, info.height);
 
-    for (let i = 0; i < data.length; i++) {
-      const val = data[i];
-      const idx = i * 4;
-      if (val === -1) {
-        imgData.data[idx]     = 200;
-        imgData.data[idx + 1] = 200;
-        imgData.data[idx + 2] = 200;
-        imgData.data[idx + 3] = 255;
-      } else if (val === 0) {
-        imgData.data[idx]     = 245;
-        imgData.data[idx + 1] = 245;
-        imgData.data[idx + 2] = 245;
-        imgData.data[idx + 3] = 255;
-      } else {
-        const intensity = Math.min(val / 100, 1);
-        imgData.data[idx]     = Math.floor(30 + intensity * 30);
-        imgData.data[idx + 1] = Math.floor(30 + intensity * 30);
-        imgData.data[idx + 2] = Math.floor(30 + intensity * 60);
-        imgData.data[idx + 3] = 255;
+    for (let y = 0; y < info.height; y++) {
+      for (let x = 0; x < info.width; x++) {
+        const rosIdx = y * info.width + x;
+        const val = data[rosIdx];
+        
+        // Flip horizontally
+        const imgX = (info.width - 1) - x;
+        const imgY = y;
+        
+        const idx = (imgY * info.width + imgX) * 4;
+
+        if (val === -1) {
+          imgData.data[idx]     = 200;
+          imgData.data[idx + 1] = 200;
+          imgData.data[idx + 2] = 200;
+          imgData.data[idx + 3] = 255;
+        } else if (val === 0) {
+          imgData.data[idx]     = 245;
+          imgData.data[idx + 1] = 245;
+          imgData.data[idx + 2] = 245;
+          imgData.data[idx + 3] = 255;
+        } else {
+          const intensity = Math.min(val / 100, 1);
+          imgData.data[idx]     = Math.floor(30 + intensity * 30);
+          imgData.data[idx + 1] = Math.floor(30 + intensity * 30);
+          imgData.data[idx + 2] = Math.floor(30 + intensity * 60);
+          imgData.data[idx + 3] = 255;
+        }
       }
     }
 
