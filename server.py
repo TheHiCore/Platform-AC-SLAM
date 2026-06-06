@@ -17,8 +17,10 @@ def kill_robot_process(robot):
     if robot in processes:
         p = processes[robot]
         try:
-            # Kill the entire process group to ensure ros2 child processes die
-            os.killpg(os.getpgid(p.pid), signal.SIGTERM)
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/F', '/T', '/PID', str(p.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                os.killpg(os.getpgid(p.pid), signal.SIGTERM)
         except Exception as e:
             print(f"Error killing process for {robot}: {e}")
         del processes[robot]
@@ -68,8 +70,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 f'source /home/thehiub/ros2_ws/install/setup.bash && ros2 launch cpp_explorer cpp_explore.launch.py namespace:={robot} graph_yaml_path:={yaml_file}'
             ]
             
-            # Start process in a new process group
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, preexec_fn=os.setsid)
+            kwargs = {}
+            if os.name == 'nt':
+                kwargs['creationflags'] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                kwargs['preexec_fn'] = os.setsid
+
+            p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, **kwargs)
             processes[robot] = p
             
             self.send_response(200)

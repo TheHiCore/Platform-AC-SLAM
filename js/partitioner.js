@@ -374,15 +374,19 @@ function _hideGraphRotationBadgeDelayed() {
   }, 1500);
 }
 
-function doResize() {
+function doResize(shouldFit = false) {
   if (!cv) return;
   const dpr = window.devicePixelRatio || 1;
   const wrap = cv.parentElement;
   if (!wrap) return;
+  // Clear explicit dimensions so the wrapper dictates the size
+  cv.style.width = '100%';
+  cv.style.height = '100%';
   const r = wrap.getBoundingClientRect();
   cv.width = r.width * dpr; cv.height = r.height * dpr;
   cv.style.width = r.width + 'px'; cv.style.height = r.height + 'px';
-  ctx.scale(dpr, dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (shouldFit && graphData && graphData.nodes) fitGraph(graphData.nodes);
   draw();
 }
 
@@ -430,7 +434,7 @@ function _updateFsYAMLHighlight() {
 }
 
 // ── Fullscreen ──
-let fsGraphCanvas = null, fsGraphCtx = null, fsGraphActive = false;
+
 let fsYamlActive = false;
 
 function _initFullscreen() {
@@ -452,140 +456,99 @@ function _initFullscreen() {
     }
   };
 
-  const fsYamlBtnInline = document.getElementById('part-fs-yaml-inline');
-  if (fsYamlBtnInline) fsYamlBtnInline.addEventListener('click', openFsYaml);
+  // ── Unified Modal Logic ──
+  const modal = document.getElementById('enlarge-modal');
+  const modalClose = document.getElementById('modal-close');
+  const modalTabs = document.querySelectorAll('.modal-tab');
+  const modalPanes = document.querySelectorAll('.modal-pane');
+  
+  const graphOriginalParent = document.getElementById('part-graph-section');
+  const graphContentWrap = document.querySelector('.part-canvas-wrap');
+  const graphStatsRow = document.getElementById('part-stats');
+  const modalGraphPane = document.getElementById('modal-graph');
+  
+  let isModalGraphActive = false;
 
-  const fsYamlBtn = document.getElementById('part-fs-yaml');
-  if (fsYamlBtn) fsYamlBtn.addEventListener('click', openFsYaml);
-
-  const fsYamlClose = document.getElementById('fs-yaml-close');
-  if (fsYamlClose) {
-    fsYamlClose.addEventListener('click', () => {
-      const overlay = document.getElementById('fs-yaml-overlay');
-      const ta = document.getElementById('fs-yaml-textarea');
+  function _openModal(tabTarget) {
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    
+    // Switch to tab
+    modalTabs.forEach(t => {
+      t.classList.toggle('active', t.dataset.target === tabTarget);
+    });
+    modalPanes.forEach(p => {
+      p.classList.toggle('active', p.id === tabTarget);
+    });
+    
+    // Logic for YAML
+    if (tabTarget === 'modal-yaml') {
       const src = document.getElementById('part-yaml');
-      if (overlay && ta && src) {
-        src.value = ta.value;
-        _updateYAMLHighlight();
-        overlay.classList.remove('active');
-        fsYamlActive = false;
-      }
-    });
+      const ta = document.getElementById('modal-yaml-text');
+      if (src && ta) ta.value = src.value;
+    }
+    
+    // Logic for Graph Reparenting
+    if (tabTarget === 'modal-graph' && !isModalGraphActive) {
+      if (graphContentWrap) modalGraphPane.appendChild(graphContentWrap);
+      if (graphStatsRow) modalGraphPane.insertBefore(graphStatsRow, graphContentWrap);
+      isModalGraphActive = true;
+      setTimeout(() => {
+        doResize(true);
+      }, 50);
+    }
   }
 
-  // Graph fullscreen
-  const fsGraphBtn = document.getElementById('part-fs-graph');
-  if (fsGraphBtn) {
-    fsGraphBtn.addEventListener('click', () => {
-      const overlay = document.getElementById('fs-graph-overlay');
-      if (overlay) {
-        overlay.classList.add('active');
-        fsGraphActive = true;
-        fsGraphCanvas = document.getElementById('fs-graph-canvas');
-        fsGraphCtx = fsGraphCanvas.getContext('2d');
-        _resizeFsGraph();
+  function _closeModal() {
+    if (!modal) return;
+    modal.classList.add('hidden');
+    
+    // Revert graph reparenting
+    if (isModalGraphActive) {
+      if (graphOriginalParent) {
+        if (graphStatsRow) graphOriginalParent.appendChild(graphStatsRow);
+        if (graphContentWrap) graphOriginalParent.appendChild(graphContentWrap);
       }
-    });
+      isModalGraphActive = false;
+      setTimeout(() => {
+        doResize(true);
+      }, 50);
+    }
   }
-  const fsGraphClose = document.getElementById('fs-graph-close');
-  if (fsGraphClose) {
-    fsGraphClose.addEventListener('click', () => {
-      const overlay = document.getElementById('fs-graph-overlay');
-      if (overlay) {
-        overlay.classList.remove('active');
-        fsGraphActive = false;
-      }
+
+  // Handle modal tab clicks
+  modalTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      _openModal(tab.dataset.target);
     });
-  }
-  window.addEventListener('resize', () => {
-    if (fsGraphActive) _resizeFsGraph();
   });
-}
 
-function _resizeFsGraph() {
-  if (!fsGraphCanvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const r = fsGraphCanvas.parentElement.getBoundingClientRect();
-  fsGraphCanvas.width = r.width * dpr;
-  fsGraphCanvas.height = r.height * dpr;
-  fsGraphCanvas.style.width = r.width + 'px';
-  fsGraphCanvas.style.height = r.height + 'px';
-  fsGraphCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  _drawInContext(fsGraphCtx, fsGraphCanvas.getBoundingClientRect());
-}
-
-function _drawInContext(ctx, r) {
-  ctx.clearRect(0, 0, r.width, r.height);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, r.width, r.height);
-
-  if (!graphData) {
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.font = '16px Montserrat';
-    ctx.textAlign = 'center';
-    ctx.fillText('Run partitioning first', r.width / 2, r.height / 2);
-    return;
+  if (modalClose) modalClose.addEventListener('click', _closeModal);
+  
+  // Close on background click
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) _closeModal();
+    });
   }
 
-  const { nodes, edges } = graphData;
-  const labels = result ? result.labels : null;
-  const seeds = result ? new Set(result.seeds) : new Set();
+  // Close on ESC key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') _closeModal();
+  });
 
-  const pad = 80;
-  const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
-  const x0 = Math.min(...xs), x1 = Math.max(...xs);
-  const y0 = Math.min(...ys), y1 = Math.max(...ys);
-  const gw = x1 - x0 || 1, gh = y1 - y0 || 1;
-  const sc = Math.min((r.width - pad * 2) / gw, (r.height - pad * 2) / gh, 100);
-  const ox = r.width / 2 - sc * (x0 + x1) / 2;
-  const oy = r.height / 2 + sc * (y0 + y1) / 2;
+  // Enlarge buttons
+  const fsYamlBtnInline = document.getElementById('part-fs-yaml-inline');
+  if (fsYamlBtnInline) fsYamlBtnInline.addEventListener('click', () => _openModal('modal-yaml'));
 
-  function fw(wx, wy) { return { x: wx * sc + ox, y: -wy * sc + oy }; }
+  const fsGraphBtn = document.getElementById('part-fs-graph'); // On canvas
+  const fsGraphBtnInline = document.getElementById('part-fs-graph-inline'); // In header
+  if (fsGraphBtn) fsGraphBtn.addEventListener('click', () => _openModal('modal-graph'));
+  if (fsGraphBtnInline) fsGraphBtnInline.addEventListener('click', () => _openModal('modal-graph'));
 
-  for (const e of edges) {
-    const nu = nodes.find(n => n.id === e.u), nv = nodes.find(n => n.id === e.v);
-    if (!nu || !nv) continue;
-    const pu = fw(nu.x, nu.y), pv = fw(nv.x, nv.y);
-    const isCut = labels && labels[e.u] !== labels[e.v];
-    ctx.beginPath(); ctx.moveTo(pu.x, pu.y); ctx.lineTo(pv.x, pv.y);
-    if (isCut) { ctx.strokeStyle = 'rgba(255,102,0,0.5)'; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); }
-    else if (labels) { ctx.strokeStyle = COLORS[labels[e.u] % COLORS.length] + '33'; ctx.lineWidth = 3; ctx.setLineDash([]); }
-    else { ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1.5; ctx.setLineDash([]); }
-    ctx.stroke(); ctx.setLineDash([]);
-    const mx2 = (pu.x + pv.x) / 2, my2 = (pu.y + pv.y) / 2;
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.font = `${Math.min(12, sc * 0.15)}px Montserrat`;
-    ctx.textAlign = 'center';
-    ctx.fillText(e.cost, mx2, my2 - 5);
-  }
-
-  const nr = Math.max(10, Math.min(30, sc * 0.5));
-  for (const n of nodes) {
-    const p = fw(n.x, n.y);
-    const col = labels ? COLORS[labels[n.id] % COLORS.length] : '#0066FF';
-    const isSeed = seeds.has(n.id);
-    const rr = nr;
-    if (labels) {
-      const grd = ctx.createRadialGradient(p.x, p.y, rr * 0.4, p.x, p.y, rr * 3);
-      grd.addColorStop(0, col + '20'); grd.addColorStop(1, 'transparent');
-      ctx.beginPath(); ctx.arc(p.x, p.y, rr * 3, 0, Math.PI * 2);
-      ctx.fillStyle = grd; ctx.fill();
-    }
-    if (isSeed) {
-      ctx.beginPath(); ctx.arc(p.x, p.y, rr + 5, 0, Math.PI * 2);
-      ctx.strokeStyle = SEED_RING; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
-      ctx.stroke(); ctx.setLineDash([]);
-    }
-    ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, Math.PI * 2);
-    const grd2 = ctx.createRadialGradient(p.x - rr * 0.3, p.y - rr * 0.35, 0, p.x, p.y, rr);
-    grd2.addColorStop(0, lighten(col, 0.35)); grd2.addColorStop(1, col);
-    ctx.fillStyle = grd2; ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.1)'; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.font = `600 ${Math.min(rr * 0.75, 14)}px Montserrat`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(n.id, p.x, p.y);
-  }
+  window.addEventListener('resize', () => {
+    // Resize already handled by the resize event listener at line 416
+  });
 }
 
 // ── Log tabs ──
@@ -701,8 +664,16 @@ export function initPartitioner() {
     }
 
     if (drag) {
-      tfm.x = tfmStart.x + (mx - dragStart.x);
-      tfm.y = tfmStart.y + (my - dragStart.y);
+      // Un-rotate the screen-space drag delta so the graph follows the cursor
+      // even when rotated. tfm.x/y live in pre-rotation space, so we must
+      // apply the inverse rotation to the screen delta.
+      const rad = tfm.rotation * Math.PI / 180;
+      const dx = mx - dragStart.x;
+      const dy = my - dragStart.y;
+      const cosR = Math.cos(-rad);
+      const sinR = Math.sin(-rad);
+      tfm.x = tfmStart.x + (dx * cosR - dy * sinR);
+      tfm.y = tfmStart.y + (dx * sinR + dy * cosR);
       draw(); return;
     }
 
@@ -863,7 +834,7 @@ export function runPartition() {
       _updateEl('part-s-cut', cutC.toFixed(1));
       _showEl('part-stats');
 
-      // Legend
+      // Legend + Export + Deploy merged UI
       const partMap = {};
       for (const [id, p] of Object.entries(res.labels)) {
         partMap[p] = partMap[p] || []; partMap[p].push(id);
@@ -876,24 +847,25 @@ export function runPartition() {
           const ns = partMap[p] || [];
           const sz = ns.reduce((s, id) => { const n = nodes.find(x => x.id == id); return s + (n?.size || 1); }, 0);
           const pct = (sz / totalSize * 100).toFixed(0);
-          const div = document.createElement('div');
-          div.className = 'part-row';
-          div.innerHTML = `
+          
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'part-row';
+          
+          // Info section
+          const infoDiv = document.createElement('div');
+          infoDiv.className = 'part-info';
+          infoDiv.innerHTML = `
             <div class="part-swatch" style="background:${COLORS[p % COLORS.length]}"></div>
             <span class="part-name" style="color:${COLORS[p % COLORS.length]}">P${p}</span>
             <span class="part-nodes">${ns.sort((a, b) => a - b).join(', ')}</span>
             <span class="part-count">${ns.length}n · ${pct}%</span>
             <span class="part-conn ${conn[p] ? 'ok' : 'bad'}">${conn[p] ? 'ok' : 'disc'}</span>`;
-          legendEl.appendChild(div);
-        }
-      }
-      _showEl('part-legend');
-
-      // Export + Deploy with robot picker
-      const exportEl = document.getElementById('part-export');
-      if (exportEl) {
-        exportEl.innerHTML = '';
-        for (let p = 0; p < k; p++) {
+          
+          // Action section
+          const actionDiv = document.createElement('div');
+          actionDiv.className = 'part-actions';
+          
+          // Download YAML button
           const dlBtn = document.createElement('button');
           dlBtn.className = 'btn-export';
           dlBtn.innerHTML = `<span class="swatch" style="background:${COLORS[p % COLORS.length]}"></span>P${p}.yaml`;
@@ -903,32 +875,42 @@ export function runPartition() {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob); a.download = `partition_${p}.yaml`; a.click();
           };
-          exportEl.appendChild(dlBtn);
-
-          const deployWrap = document.createElement('span');
-          deployWrap.style.cssText = 'display:inline-flex;align-items:center;gap:3px;';
-
-          const sel = document.createElement('select');
-          sel.className = 'deploy-select';
-          sel.innerHTML = '<option value="robot1">R1</option><option value="robot2">R2</option>';
-
+          
+          // Robot Deploy Tabs
+          const deployTabs = document.createElement('div');
+          deployTabs.className = 'deploy-tabs';
+          const r1Btn = document.createElement('button');
+          r1Btn.className = 'deploy-tab active';
+          r1Btn.textContent = 'R1';
+          r1Btn.dataset.robot = 'robot1';
+          const r2Btn = document.createElement('button');
+          r2Btn.className = 'deploy-tab';
+          r2Btn.textContent = 'R2';
+          r2Btn.dataset.robot = 'robot2';
+          
+          let selectedRobot = 'robot1';
+          r1Btn.onclick = () => { r1Btn.classList.add('active'); r2Btn.classList.remove('active'); selectedRobot = 'robot1'; };
+          r2Btn.onclick = () => { r2Btn.classList.add('active'); r1Btn.classList.remove('active'); selectedRobot = 'robot2'; };
+          deployTabs.appendChild(r1Btn);
+          deployTabs.appendChild(r2Btn);
+          
+          // Deploy button
           const deployBtn = document.createElement('button');
           deployBtn.className = 'btn-deploy';
           deployBtn.textContent = `Deploy P${p}`;
           deployBtn.onclick = async () => {
-            const robotKey = sel.value;
             const yamlOut = exportPart(p, nodes, edges || [], res.labels);
             deployBtn.textContent = 'Sending...';
             try {
               const resp = await fetch('/launch', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ robot: robotKey, yaml: yamlOut })
+                body: JSON.stringify({ robot: selectedRobot, yaml: yamlOut })
               });
               if (!resp.ok) throw new Error('Backend error ' + resp.status);
               deployBtn.textContent = 'Launched!';
               setTimeout(() => { deployBtn.textContent = `Deploy P${p}`; }, 2000);
-              startLogStream(robotKey);
+              startLogStream(selectedRobot);
             } catch (err) {
               console.error(err);
               deployBtn.textContent = 'Failed';
@@ -937,20 +919,22 @@ export function runPartition() {
             }
           };
 
-          deployWrap.appendChild(sel);
-          deployWrap.appendChild(deployBtn);
-          exportEl.appendChild(deployWrap);
+          actionDiv.appendChild(dlBtn);
+          actionDiv.appendChild(deployTabs);
+          actionDiv.appendChild(deployBtn);
+          
+          rowDiv.appendChild(infoDiv);
+          rowDiv.appendChild(actionDiv);
+          legendEl.appendChild(rowDiv);
         }
       }
-      _showEl('part-export');
+      _showEl('part-legend');
 
       const allConn = conn.every(Boolean);
       if (hud) {
         hud.textContent = `k=${k} · ${allConn ? 'all connected' : 'check connectivity'}`;
         hud.className = 'part-hud' + (allConn ? ' active' : '');
       }
-
-      if (fsGraphActive) _resizeFsGraph();
 
     } catch (err) {
       _showPartErr('Error: ' + err.message);

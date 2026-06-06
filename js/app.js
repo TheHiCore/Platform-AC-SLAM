@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
   _initModeSelector();
   _initRobotTabs();
   _initResizeHandle();
-  _initMissionTime();
+  _initVerticalResizeHandles();
   initMapViewer();
   initTeleop();
   initPartitioner();
@@ -122,16 +122,104 @@ function _initResizeHandle() {
   });
 }
 
-let missionStartTime = null;
-let missionInterval = null;
+function _initVerticalResizeHandles() {
+  const resizeYaml = document.getElementById('resize-yaml');
+  const yamlSection = document.getElementById('part-yaml-section');
+  const resizeLogs = document.getElementById('resize-logs');
+  const logsSection = document.getElementById('part-logs-section');
 
-function _initMissionTime() {
-  missionStartTime = Date.now();
-  missionInterval = setInterval(() => {
-    const elapsed = Math.floor((Date.now() - missionStartTime) / 1000);
-    const m = Math.floor(elapsed / 60).toString().padStart(2, '0');
-    const s = (elapsed % 60).toString().padStart(2, '0');
-    const el = document.getElementById('mission-time');
-    if (el) el.textContent = `${m}:${s}`;
-  }, 1000);
+  if (resizeYaml && yamlSection) {
+    let isResizingYaml = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    resizeYaml.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isResizingYaml = true;
+      startY = e.clientY;
+      startHeight = yamlSection.getBoundingClientRect().height;
+      resizeYaml.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizingYaml) return;
+      const dy = e.clientY - startY;
+      const newHeight = Math.max(50, startHeight + dy);
+      yamlSection.style.height = newHeight + 'px';
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizingYaml) {
+        isResizingYaml = false;
+        resizeYaml.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+  }
+
+  if (resizeLogs && logsSection) {
+    let isResizingLogs = false;
+    let startY = 0;
+    let startHeight = 0;
+
+    resizeLogs.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isResizingLogs = true;
+      startY = e.clientY;
+      startHeight = logsSection.getBoundingClientRect().height;
+      resizeLogs.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isResizingLogs) return;
+      // For logs, it's at the bottom, so dragging up increases height (negative dy)
+      const dy = startY - e.clientY;
+      const newHeight = Math.max(50, startHeight + dy);
+      logsSection.style.height = newHeight + 'px';
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isResizingLogs) {
+        isResizingLogs = false;
+        resizeLogs.classList.remove('active');
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    });
+  }
+
+  // Toggle sections when clicking titles
+  const titleYaml = document.getElementById('title-toggle-yaml');
+  if (titleYaml && yamlSection) {
+    titleYaml.addEventListener('click', () => {
+      yamlSection.classList.toggle('collapsed');
+      if (resizeYaml) resizeYaml.classList.toggle('collapsed');
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+
+  const titleGraph = document.getElementById('title-toggle-graph');
+  const graphSection = document.getElementById('part-graph-section');
+  if (titleGraph && graphSection) {
+    titleGraph.addEventListener('click', () => {
+      graphSection.classList.toggle('collapsed');
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+
+  const titleLogs = document.getElementById('title-toggle-logs');
+  if (titleLogs && logsSection) {
+    titleLogs.addEventListener('click', () => {
+      logsSection.classList.toggle('collapsed');
+      if (resizeLogs) resizeLogs.classList.toggle('collapsed');
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
 }

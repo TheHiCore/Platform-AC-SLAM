@@ -248,7 +248,7 @@ const mapViewer = {
       const wx = (relX * cosR - relY * sinR) / tfm.scale;
       const wy = (relX * sinR + relY * cosR) / tfm.scale;
 
-      tfm.scale = Math.max(0.1, Math.min(50, tfm.scale * factor));
+      tfm.scale = Math.max(0.1, Math.min(200, tfm.scale * factor));
 
       const newRelX = wx * tfm.scale, newRelY = wy * tfm.scale;
       const rotNewX = newRelX * Math.cos(rad) - newRelY * Math.sin(rad);

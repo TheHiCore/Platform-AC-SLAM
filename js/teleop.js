@@ -67,14 +67,26 @@ export function initTeleop() {
     x = 0; y = 0; z = 0; th = 0;
   });
 
-  // Keyboard events
+  // Keyboard events — no CapsLock/Shift holonomic detection
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    const holonomicActive = e.getModifierState('CapsLock') || e.shiftKey;
-    _updateHolonomicUI(holonomicActive);
+    let key = e.key;
 
-    const key = e.key;
+    // Apply holonomic mode from checkbox if active
+    const checkbox = document.getElementById('holonomic-checkbox');
+    const isHolonomic = checkbox && checkbox.checked;
+    
+    // Only map lowercase movement keys to their holonomic equivalents if they are pressed
+    if (isHolonomic) {
+      if (['i', 'o', 'j', 'l', 'u', 'm', 't', 'b'].includes(key)) {
+        key = key.toUpperCase();
+      } else if (key === ',') {
+        key = '<';
+      } else if (key === '.') {
+        key = '>';
+      }
+    }
 
     if (moveBindings[key]) {
       e.preventDefault();
@@ -96,11 +108,6 @@ export function initTeleop() {
     }
   });
 
-  document.addEventListener('keyup', (e) => {
-    const holonomicActive = e.getModifierState('CapsLock') || e.shiftKey;
-    _updateHolonomicUI(holonomicActive);
-  });
-
   // UI Button events
   Object.keys(btnToKey).forEach(btnDir => {
     const btn = document.getElementById(`btn-${btnDir}`);
@@ -110,9 +117,9 @@ export function initTeleop() {
       e.preventDefault();
       let key = btnToKey[btnDir];
       
-      // If holonomic is toggled on via UI or CapsLock, use uppercase for movement
-      const track = document.getElementById('holonomic-switch');
-      const isHolonomic = track && track.classList.contains('on');
+      // If holonomic is toggled on via UI checkbox, use uppercase for movement
+      const checkbox = document.getElementById('holonomic-checkbox');
+      const isHolonomic = checkbox && checkbox.checked;
       if (isHolonomic && key !== 'k' && key !== ',' && key !== '.') {
         key = key.toUpperCase();
       } else if (isHolonomic && key === ',') { key = '<'; }
@@ -130,14 +137,7 @@ export function initTeleop() {
     });
   });
 
-  // Holonomic switch click
-  const hSwitch = document.getElementById('holonomic-switch');
-  if (hSwitch) {
-    hSwitch.addEventListener('click', () => {
-      const isOn = hSwitch.classList.contains('on');
-      _updateHolonomicUI(!isOn);
-    });
-  }
+  // Holonomic toggle is now a standard checkbox — no extra JS needed
 
   _updateSliders();
 
@@ -199,19 +199,7 @@ function _updateSliders() {
   if (angSlider) angSlider.value = turn;
 }
 
-
-function _updateHolonomicUI(isHolonomic) {
-  const track = document.getElementById('holonomic-switch');
-  const labelOff = document.getElementById('holonomic-label');
-  const labelOn = document.getElementById('holonomic-label-on');
-
-  if (track) track.classList.toggle('on', isHolonomic);
-  if (labelOff) labelOff.style.display = isHolonomic ? 'none' : '';
-  if (labelOn) labelOn.style.display = isHolonomic ? '' : 'none';
-}
-
 export function getSelectedRobot() { return selectedRobot; }
-// Holonomic boolean getter removed as logic now entirely driven by moveBindings mapping.
 
 export function destroyTeleop() {
   if (publishInterval) {

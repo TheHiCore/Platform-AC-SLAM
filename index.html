@@ -17,10 +17,7 @@
       <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--blue)"><path d="M12 2L2 7l10 5 10-5-10-5zm0 7.5l-10-5v10l10 5 10-5v-10l-10 5z"/></svg>
       AC-SLAM
     </div>
-    <div class="mission-time">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="var(--blue)"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.2.8-1.3-4.5-2.7V7z"/></svg>
-      <span id="mission-time">00:00</span>
-    </div>
+
     <div class="spacer"></div>
     <div class="connection-bar">
       <input type="text" id="input-ros-url" class="conn-input" value="ws://localhost:9090" />
@@ -77,13 +74,14 @@
               </div>
             </div>
 
-            <!-- Holonomic row -->
+            <!-- Holonomic toggle -->
             <div class="holonomic-row">
-              <span class="switch-label" id="holonomic-label">Non-Holonomic</span>
-              <div class="switch-track" id="holonomic-switch">
-                <div class="switch-thumb"></div>
-              </div>
-              <span class="switch-label" id="holonomic-label-on" style="display:none;">Holonomic</span>
+              <span class="holo-label">Non-Holonomic</span>
+              <label class="toggle-switch" id="holonomic-switch">
+                <input type="checkbox" id="holonomic-checkbox">
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="holo-label">Holonomic</span>
             </div>
 
             <!-- Speed hints -->
@@ -91,18 +89,35 @@
               <div>q/z &mdash; speeds &plusmn;10%</div>
               <div>w/x &mdash; linear &plusmn;10%</div>
               <div>e/c &mdash; angular &plusmn;10%</div>
-              <div class="speed-vals">
-                Lin: <span id="teleop-speed-val">0.50</span>
-                &nbsp;|&nbsp;
-                Ang: <span id="teleop-angular-speed-val">1.00</span>
+              <div class="speed-vals-big">
+                <div class="speed-val-item">
+                  <span class="speed-val-label">LINEAR</span>
+                  <span class="speed-val-number" id="teleop-speed-val">0.50</span>
+                  <span class="speed-val-unit">m/s</span>
+                </div>
+                <div class="speed-val-divider"></div>
+                <div class="speed-val-item">
+                  <span class="speed-val-label">ANGULAR</span>
+                  <span class="speed-val-number" id="teleop-angular-speed-val">1.00</span>
+                  <span class="speed-val-unit">rad/s</span>
+                </div>
               </div>
             </div>
 
             <!-- Velocity readout -->
             <div class="teleop-stats">
-              <div>vx: <span id="vel-lin-x">0.00</span></div>
-              <div>vy: <span id="vel-lin-y">0.00</span></div>
-              <div>&#969;: <span id="vel-ang-z">0.00</span></div>
+              <div class="vel-readout">
+                <span class="vel-label">vx</span>
+                <span class="vel-value" id="vel-lin-x">0.00</span>
+              </div>
+              <div class="vel-readout">
+                <span class="vel-label">vy</span>
+                <span class="vel-value" id="vel-lin-y">0.00</span>
+              </div>
+              <div class="vel-readout">
+                <span class="vel-label">&omega;</span>
+                <span class="vel-value" id="vel-ang-z">0.00</span>
+              </div>
             </div>
 
             <!-- Robot image placeholders at bottom -->
@@ -131,9 +146,9 @@
           <div class="part-container">
 
             <!-- YAML section — map-panel style: header + divider + code -->
-            <div class="yaml-section">
+            <div class="yaml-section" id="part-yaml-section">
               <div class="yaml-section-header">
-                <span>GRAPH DEFINITION (YAML)</span>
+                <span id="title-toggle-yaml" class="section-title-btn" title="Click to collapse/expand">GRAPH DEFINITION (YAML)</span>
                 <div class="yaml-header-actions">
                   <button class="btn-thin" id="part-fs-yaml-inline" title="Enlarge">&#x26F6; Enlarge</button>
                 </div>
@@ -161,14 +176,22 @@ edges:
     v: 1
     cost: 1.0</textarea>
               </div>
-              <div class="yaml-footer-actions">
-                <button class="btn-thin" id="part-fs-yaml" title="Fullscreen YAML">&#x26F6; Fullscreen</button>
-              </div>
             </div>
+            
+            <!-- Resizable Divider for YAML -->
+            <div class="resize-handle-v" id="resize-yaml"></div>
 
             <div id="part-error"></div>
 
-            <div id="part-stats" class="part-stats-row" style="display:none;">
+            <div class="graph-section" id="part-graph-section">
+              <div class="yaml-section-header">
+                <span id="title-toggle-graph" class="section-title-btn" title="Click to collapse/expand">GRAPH VISUALIZATION</span>
+                <div class="yaml-header-actions">
+                  <button class="btn-thin" id="part-fs-graph-inline" title="Enlarge">&#x26F6; Enlarge</button>
+                </div>
+              </div>
+
+              <div id="part-stats" class="part-stats-row" style="display:none;">
               <div class="part-stat"><div class="part-stat-val" id="part-s-nodes">-</div><div class="part-stat-lbl">Nodes</div></div>
               <div class="part-stat"><div class="part-stat-val" id="part-s-edges">-</div><div class="part-stat-lbl">Edges</div></div>
               <div class="part-stat"><div class="part-stat-val" id="part-s-k">-</div><div class="part-stat-lbl">Parts</div></div>
@@ -179,7 +202,8 @@ edges:
             <div class="part-canvas-wrap">
               <div id="part-hud" class="part-hud">waiting...</div>
               <!-- Overlay controls inside canvas — thin, map-style -->
-              <div class="graph-overlay-controls">
+              <!-- Parameters overlay — top left -->
+              <div class="graph-params-overlay">
                 <div class="graph-param-row">
                   <label class="graph-param-lbl">k</label>
                   <input id="part-k" class="graph-param-input" type="number" value="2" min="2">
@@ -192,26 +216,31 @@ edges:
                   <label class="graph-param-lbl">Seed</label>
                   <input id="part-seed" class="graph-param-input" type="number" value="42">
                 </div>
-                <button id="part-run-btn" class="graph-run-btn">RUN</button>
               </div>
-              <!-- Enlarge button on right side -->
-              <button class="graph-enlarge-btn" id="part-fs-graph" title="Enlarge graph">&#x26F6;</button>
+              <button id="part-run-btn" class="graph-run-btn-float">RUN</button>
               <!-- Rotation badge -->
               <div class="graph-rotation-badge" id="graph-rotation-badge">0.0 deg</div>
               <canvas id="part-canvas"></canvas>
               <div id="part-tooltip"></div>
             </div>
+          </div>
 
             <div id="part-legend" class="part-legend" style="display:none;"></div>
 
-            <div id="part-export" class="part-export" style="display:none;"></div>
+
+            
+            <!-- Resizable Divider for Logs -->
+            <div class="resize-handle-v" id="resize-logs"></div>
 
             <!-- Logs section with R1/R2 tabs -->
-            <div class="part-terminal-wrap">
+            <div class="part-terminal-wrap" id="part-logs-section">
               <div class="terminal-tabs-row">
-                <div class="terminal-tabs">
-                  <button class="terminal-tab active" id="log-tab-robot1" data-log-robot="robot1">Robot 1</button>
-                  <button class="terminal-tab" id="log-tab-robot2" data-log-robot="robot2">Robot 2</button>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span id="title-toggle-logs" class="section-title-btn" title="Click to collapse/expand" style="font-size:0.6rem; font-weight:var(--fw-bold); color:var(--text-secondary); letter-spacing:0.08em; text-transform:uppercase;">CPP Explorer Logs</span>
+                  <div class="terminal-tabs">
+                    <button class="terminal-tab active" id="log-tab-robot1" data-log-robot="robot1">Robot 1</button>
+                    <button class="terminal-tab" id="log-tab-robot2" data-log-robot="robot2">Robot 2</button>
+                  </div>
                 </div>
                 <div class="terminal-actions">
                   <button id="btn-stop-node" class="btn-thin btn-thin-danger" style="display:none;">Stop Node</button>
@@ -262,28 +291,25 @@ edges:
 
 </div>
 
-<!-- Fullscreen YAML overlay -->
-<div class="fullscreen-overlay" id="fs-yaml-overlay">
-  <div class="fullscreen-header">
-    <span>YAML EDITOR</span>
-    <button class="btn-thin" id="fs-yaml-close">Close</button>
-  </div>
-  <div class="fullscreen-body">
-    <div class="fs-yaml-inner">
-      <pre class="yaml-highlight fs-yaml-highlight" id="fs-yaml-highlight"></pre>
-      <textarea id="fs-yaml-textarea" spellcheck="false"></textarea>
+<!-- Unified Enlarge Modal -->
+<div class="modal-overlay hidden" id="enlarge-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-tabs">
+        <button class="modal-tab active" data-target="modal-graph">Graph</button>
+        <button class="modal-tab" data-target="modal-yaml">YAML</button>
+      </div>
+      <button id="modal-close" class="btn-thin">Close</button>
     </div>
-  </div>
-</div>
-
-<!-- Fullscreen Graph overlay -->
-<div class="fullscreen-overlay" id="fs-graph-overlay">
-  <div class="fullscreen-header">
-    <span>GRAPH VISUALIZATION</span>
-    <button class="btn-thin" id="fs-graph-close">Close</button>
-  </div>
-  <div class="fullscreen-body">
-    <canvas id="fs-graph-canvas"></canvas>
+    <div class="modal-body">
+      <!-- Graph Pane: The main canvas wrap will be moved here -->
+      <div id="modal-graph" class="modal-pane active">
+      </div>
+      <!-- YAML Pane: Copy of the YAML editor -->
+      <div id="modal-yaml" class="modal-pane">
+        <textarea id="modal-yaml-text" spellcheck="false" readonly></textarea>
+      </div>
+    </div>
   </div>
 </div>
 
