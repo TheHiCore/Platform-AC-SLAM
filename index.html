@@ -1,161 +1,163 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AC-SLAM Mission Control</title>
   <link rel="stylesheet" href="css/main.css">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
 </head>
+
 <body>
 
-<div class="app-shell">
+  <div class="app-shell">
 
-  <!-- App Bar -->
-  <header class="app-bar">
-    <div class="brand">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="var(--blue)"><path d="M12 2L2 7l10 5 10-5-10-5zm0 7.5l-10-5v10l10 5 10-5v-10l-10 5z"/></svg>
-      AC-SLAM
-    </div>
-
-    <div class="spacer"></div>
-    <div class="connection-bar">
-      <input type="text" id="input-ros-url" class="conn-input" value="ws://localhost:9090" />
-      <button id="btn-connect" class="btn btn-primary">Connect</button>
-      <div class="status-indicator">
-        <div id="status-dot" class="status-dot disconnected"></div>
-        <span id="status-text">Disconnected</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- Main Layout: Left Panel + Divider + Right Maps -->
-  <div class="app-main">
-
-    <!-- Left Panel -->
-    <div class="left-panel" id="left-panel">
-
-      <!-- Mode Selector — thin sharp tabs like map thumbs -->
-      <div class="mode-tabs">
-        <button class="mode-tab active" data-mode="teleop">TELEOP</button>
-        <button class="mode-tab" data-mode="partitioner">PARTITIONER</button>
+    <!-- App Bar -->
+    <header class="app-bar">
+      <div class="brand">
+        <img src="images/acslam_logo.png" alt="AC-SLAM Logo" width="20" height="20" class="custom-logo custom-logo-appbar" />
+        AC-SLAM
+        <button class="info-btn" id="btn-info" title="About this project">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        </button>
       </div>
 
-      <!-- Mode Content -->
-      <div class="mode-content">
+      <div class="spacer"></div>
+      <div class="connection-bar">
+        <input type="text" id="input-ros-url" class="conn-input" value="ws://localhost:9090" />
+        <button id="btn-connect" class="btn btn-primary">Connect</button>
+        <div class="status-indicator">
+          <div id="status-dot" class="status-dot disconnected"></div>
+          <span id="status-text">Disconnected</span>
+        </div>
+      </div>
+    </header>
 
-        <!-- ─── Teleop Mode ─── -->
-        <div id="mode-teleop" class="mode-panel active">
+    <!-- Main Layout: Left Panel + Divider + Right Maps -->
+    <div class="app-main">
 
-          <!-- Robot tabs at top (like map thumbnails) -->
-          <div class="robot-tabs">
-            <div class="robot-tab active" id="robot-tab-robot1" data-robot="robot1">
-              <div class="panel-header">Robot 1</div>
-            </div>
-            <div class="robot-tab" id="robot-tab-robot2" data-robot="robot2">
-              <div class="panel-header">Robot 2</div>
-            </div>
-          </div>
+      <!-- Left Panel -->
+      <div class="left-panel" id="left-panel">
 
-          <div class="teleop-ui">
-
-            <!-- D-pad on top -->
-            <div class="dpad-section">
-              <div class="d-pad-8">
-                <button id="btn-nw" class="d-btn d-nw">u</button>
-                <button id="btn-n"  class="d-btn d-n" >i</button>
-                <button id="btn-ne" class="d-btn d-ne">o</button>
-                <button id="btn-w"  class="d-btn d-w" >j</button>
-                <button id="btn-stop" class="d-btn d-stop d-stop-grid">k</button>
-                <button id="btn-e"  class="d-btn d-e" >l</button>
-                <button id="btn-sw" class="d-btn d-sw">m</button>
-                <button id="btn-s"  class="d-btn d-s" >,</button>
-                <button id="btn-se" class="d-btn d-se">.</button>
-              </div>
-            </div>
-
-            <!-- Holonomic toggle -->
-            <div class="holonomic-row">
-              <span class="holo-label">Non-Holonomic</span>
-              <label class="toggle-switch" id="holonomic-switch">
-                <input type="checkbox" id="holonomic-checkbox">
-                <span class="toggle-slider"></span>
-              </label>
-              <span class="holo-label">Holonomic</span>
-            </div>
-
-            <!-- Speed hints -->
-            <div class="speed-hints">
-              <div>q/z &mdash; speeds &plusmn;10%</div>
-              <div>w/x &mdash; linear &plusmn;10%</div>
-              <div>e/c &mdash; angular &plusmn;10%</div>
-              <div class="speed-vals-big">
-                <div class="speed-val-item">
-                  <span class="speed-val-label">LINEAR</span>
-                  <span class="speed-val-number" id="teleop-speed-val">0.50</span>
-                  <span class="speed-val-unit">m/s</span>
-                </div>
-                <div class="speed-val-divider"></div>
-                <div class="speed-val-item">
-                  <span class="speed-val-label">ANGULAR</span>
-                  <span class="speed-val-number" id="teleop-angular-speed-val">1.00</span>
-                  <span class="speed-val-unit">rad/s</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Velocity readout -->
-            <div class="teleop-stats">
-              <div class="vel-readout">
-                <span class="vel-label">vx</span>
-                <span class="vel-value" id="vel-lin-x">0.00</span>
-              </div>
-              <div class="vel-readout">
-                <span class="vel-label">vy</span>
-                <span class="vel-value" id="vel-lin-y">0.00</span>
-              </div>
-              <div class="vel-readout">
-                <span class="vel-label">&omega;</span>
-                <span class="vel-value" id="vel-ang-z">0.00</span>
-              </div>
-            </div>
-
-            <!-- Robot image placeholders at bottom -->
-            <div class="robot-images">
-              <div class="robot-img-wrap" id="robot-img-robot1">
-                <div class="robot-img-placeholder">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--blue)" opacity="0.3"><path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m9 8v-2h-6V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v2H3v2h1l1 9h14l1-9h1z"/></svg>
-                  <span class="robot-img-label">Robot 1</span>
-                  <span class="robot-img-hint">Replace with robot photo</span>
-                </div>
-              </div>
-              <div class="robot-img-wrap hidden" id="robot-img-robot2">
-                <div class="robot-img-placeholder">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="var(--orange)" opacity="0.3"><path d="M12 2a3 3 0 0 1 3 3 3 3 0 0 1-3 3 3 3 0 0 1-3-3 3 3 0 0 1 3-3m9 8v-2h-6V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3v2H3v2h1l1 9h14l1-9h1z"/></svg>
-                  <span class="robot-img-label">Robot 2</span>
-                  <span class="robot-img-hint">Replace with robot photo</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
+        <!-- Mode Selector — thin sharp tabs like map thumbs -->
+        <div class="mode-tabs">
+          <button class="mode-tab active" data-mode="teleop">TELEOP</button>
+          <button class="mode-tab" data-mode="partitioner">PARTITIONER</button>
         </div>
 
-        <!-- ─── Partitioner Mode ─── -->
-        <div id="mode-partitioner" class="mode-panel">
-          <div class="part-container">
+        <!-- Mode Content -->
+        <div class="mode-content">
 
-            <!-- YAML section — map-panel style: header + divider + code -->
-            <div class="yaml-section" id="part-yaml-section">
-              <div class="yaml-section-header">
-                <span id="title-toggle-yaml" class="section-title-btn" title="Click to collapse/expand">GRAPH DEFINITION (YAML)</span>
-                <div class="yaml-header-actions">
-                  <button class="btn-thin" id="part-fs-yaml-inline" title="Enlarge">&#x26F6; Enlarge</button>
+          <!-- ─── Teleop Mode ─── -->
+          <div id="mode-teleop" class="mode-panel active">
+
+            <!-- Robot tabs at top (like map thumbnails) -->
+            <div class="robot-tabs">
+              <div class="robot-tab active" id="robot-tab-robot1" data-robot="robot1">
+                <div class="panel-header">Robot 1</div>
+              </div>
+              <div class="robot-tab" id="robot-tab-robot2" data-robot="robot2">
+                <div class="panel-header">Robot 2</div>
+              </div>
+            </div>
+
+            <div class="teleop-ui">
+
+              <!-- D-pad on top -->
+              <div class="dpad-section">
+                <div class="d-pad-8">
+                  <button id="btn-nw" class="d-btn d-nw">u</button>
+                  <button id="btn-n" class="d-btn d-n">i</button>
+                  <button id="btn-ne" class="d-btn d-ne">o</button>
+                  <button id="btn-w" class="d-btn d-w">j</button>
+                  <button id="btn-stop" class="d-btn d-stop d-stop-grid">k</button>
+                  <button id="btn-e" class="d-btn d-e">l</button>
+                  <button id="btn-sw" class="d-btn d-sw">m</button>
+                  <button id="btn-s" class="d-btn d-s">,</button>
+                  <button id="btn-se" class="d-btn d-se">.</button>
                 </div>
               </div>
-              <div class="yaml-code-area">
-                <pre class="yaml-highlight" id="yaml-highlight"></pre>
-                <textarea id="part-yaml" class="yaml-textarea" spellcheck="false">nodes:
+
+              <!-- Holonomic toggle -->
+              <div class="holonomic-row">
+                <label class="toggle-switch" id="holonomic-switch">
+                  <input type="checkbox" id="holonomic-checkbox">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="holo-label">Holonomic Drive</span>
+              </div>
+
+              <!-- Speed hints -->
+              <div class="speed-hints">
+                <div>q/z &mdash; speeds &plusmn;10%</div>
+                <div>w/x &mdash; linear &plusmn;10%</div>
+                <div>e/c &mdash; angular &plusmn;10%</div>
+                <div class="speed-vals-big">
+                  <div class="speed-val-item">
+                    <span class="speed-val-label">LINEAR</span>
+                    <span class="speed-val-number" id="teleop-speed-val">0.50</span>
+                    <span class="speed-val-unit">m/s</span>
+                  </div>
+                  <div class="speed-val-divider"></div>
+                  <div class="speed-val-item">
+                    <span class="speed-val-label">ANGULAR</span>
+                    <span class="speed-val-number" id="teleop-angular-speed-val">1.00</span>
+                    <span class="speed-val-unit">rad/s</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Velocity readout -->
+              <div class="teleop-stats">
+                <div class="vel-readout">
+                  <span class="vel-label">vx</span>
+                  <span class="vel-value" id="vel-lin-x">0.00</span>
+                </div>
+                <div class="vel-readout">
+                  <span class="vel-label">vy</span>
+                  <span class="vel-value" id="vel-lin-y">0.00</span>
+                </div>
+                <div class="vel-readout">
+                  <span class="vel-label">&omega;</span>
+                  <span class="vel-value" id="vel-ang-z">0.00</span>
+                </div>
+              </div>
+
+              <!-- Robot image placeholders at bottom -->
+              <div class="robot-images">
+                <div class="robot-img-wrap" id="robot-img-robot1">
+                  <img src="images/robot1.png" alt="Robot 1" class="robot-img" />
+                  <span class="robot-img-label">Robot 1</span>
+                </div>
+                <div class="robot-img-wrap hidden" id="robot-img-robot2">
+                  <img src="images/robot2.png" alt="Robot 2" class="robot-img" />
+                  <span class="robot-img-label">Robot 2</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- ─── Partitioner Mode ─── -->
+          <div id="mode-partitioner" class="mode-panel">
+            <div class="part-container">
+
+              <!-- YAML section — map-panel style: header + divider + code -->
+              <div class="yaml-section" id="part-yaml-section">
+                <div class="yaml-section-header">
+                  <span id="title-toggle-yaml" class="section-title-btn" title="Click to collapse/expand">GRAPH
+                    DEFINITION (YAML)</span>
+                  <div class="yaml-header-actions">
+                    <button class="enlarge-icon-btn" id="part-fs-yaml-inline" title="Enlarge">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <div class="yaml-code-area">
+                  <pre class="yaml-highlight" id="yaml-highlight"></pre>
+                  <textarea id="part-yaml" class="yaml-textarea" spellcheck="false">nodes:
   - id: 1
     x: 0.0
     y: 0.0
@@ -175,145 +177,310 @@ edges:
   - u: 3
     v: 1
     cost: 1.0</textarea>
-              </div>
-            </div>
-            
-            <!-- Resizable Divider for YAML -->
-            <div class="resize-handle-v" id="resize-yaml"></div>
-
-            <div id="part-error"></div>
-
-            <div class="graph-section" id="part-graph-section">
-              <div class="yaml-section-header">
-                <span id="title-toggle-graph" class="section-title-btn" title="Click to collapse/expand">GRAPH VISUALIZATION</span>
-                <div class="yaml-header-actions">
-                  <button class="btn-thin" id="part-fs-graph-inline" title="Enlarge">&#x26F6; Enlarge</button>
                 </div>
               </div>
 
-              <div id="part-stats" class="part-stats-row" style="display:none;">
-              <div class="part-stat"><div class="part-stat-val" id="part-s-nodes">-</div><div class="part-stat-lbl">Nodes</div></div>
-              <div class="part-stat"><div class="part-stat-val" id="part-s-edges">-</div><div class="part-stat-lbl">Edges</div></div>
-              <div class="part-stat"><div class="part-stat-val" id="part-s-k">-</div><div class="part-stat-lbl">Parts</div></div>
-              <div class="part-stat"><div class="part-stat-val" id="part-s-cut">-</div><div class="part-stat-lbl">Cut</div></div>
-            </div>
+              <!-- Resizable Divider for YAML -->
+              <div class="resize-handle-v" id="resize-yaml"></div>
 
-            <!-- Graph canvas with overlay controls -->
-            <div class="part-canvas-wrap">
-              <div id="part-hud" class="part-hud">waiting...</div>
-              <!-- Overlay controls inside canvas — thin, map-style -->
-              <!-- Parameters overlay — top left -->
-              <div class="graph-params-overlay">
-                <div class="graph-param-row">
-                  <label class="graph-param-lbl">k</label>
-                  <input id="part-k" class="graph-param-input" type="number" value="2" min="2">
-                </div>
-                <div class="graph-param-row">
-                  <label class="graph-param-lbl">Bal</label>
-                  <input id="part-bal" class="graph-param-input" type="number" value="2.0" step="0.5">
-                </div>
-                <div class="graph-param-row">
-                  <label class="graph-param-lbl">Seed</label>
-                  <input id="part-seed" class="graph-param-input" type="number" value="42">
-                </div>
-              </div>
-              <button id="part-run-btn" class="graph-run-btn-float">RUN</button>
-              <!-- Rotation badge -->
-              <div class="graph-rotation-badge" id="graph-rotation-badge">0.0 deg</div>
-              <canvas id="part-canvas"></canvas>
-              <div id="part-tooltip"></div>
-            </div>
-          </div>
+              <div id="part-error"></div>
 
-            <div id="part-legend" class="part-legend" style="display:none;"></div>
-
-
-            
-            <!-- Resizable Divider for Logs -->
-            <div class="resize-handle-v" id="resize-logs"></div>
-
-            <!-- Logs section with R1/R2 tabs -->
-            <div class="part-terminal-wrap" id="part-logs-section">
-              <div class="terminal-tabs-row">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span id="title-toggle-logs" class="section-title-btn" title="Click to collapse/expand" style="font-size:0.6rem; font-weight:var(--fw-bold); color:var(--text-secondary); letter-spacing:0.08em; text-transform:uppercase;">CPP Explorer Logs</span>
-                  <div class="terminal-tabs">
-                    <button class="terminal-tab active" id="log-tab-robot1" data-log-robot="robot1">Robot 1</button>
-                    <button class="terminal-tab" id="log-tab-robot2" data-log-robot="robot2">Robot 2</button>
+              <div class="graph-section" id="part-graph-section">
+                <div class="yaml-section-header">
+                  <span id="title-toggle-graph" class="section-title-btn" title="Click to collapse/expand">GRAPH
+                    VISUALIZATION</span>
+                  <div class="yaml-header-actions">
+                    <button class="enlarge-icon-btn" id="part-fs-graph-inline" title="Enlarge">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                    </button>
                   </div>
                 </div>
-                <div class="terminal-actions">
-                  <button id="btn-stop-node" class="btn-thin btn-thin-danger" style="display:none;">Stop Node</button>
-                  <button id="btn-clear-logs" class="btn-thin">Clear</button>
+
+                <div id="part-stats" class="part-stats-row" style="display:none;">
+                  <div class="part-stat">
+                    <div class="part-stat-val" id="part-s-nodes">-</div>
+                    <div class="part-stat-lbl">Nodes</div>
+                  </div>
+                  <div class="part-stat">
+                    <div class="part-stat-val" id="part-s-edges">-</div>
+                    <div class="part-stat-lbl">Edges</div>
+                  </div>
+                  <div class="part-stat">
+                    <div class="part-stat-val" id="part-s-k">-</div>
+                    <div class="part-stat-lbl">Parts</div>
+                  </div>
+                  <div class="part-stat">
+                    <div class="part-stat-val" id="part-s-cut">-</div>
+                    <div class="part-stat-lbl">Cut</div>
+                  </div>
+                </div>
+
+                <!-- Graph canvas with overlay controls -->
+                <div class="part-canvas-wrap">
+                  <div id="part-hud" class="part-hud">waiting...</div>
+                  <!-- Overlay controls inside canvas — thin, map-style -->
+                  <!-- Parameters overlay — top left -->
+                  <div class="graph-params-overlay">
+                    <div class="graph-param-row">
+                      <label class="graph-param-lbl">k</label>
+                      <input id="part-k" class="graph-param-input" type="number" value="2" min="2">
+                    </div>
+                    <div class="graph-param-row">
+                      <label class="graph-param-lbl">Bal</label>
+                      <input id="part-bal" class="graph-param-input" type="number" value="2.0" step="0.5">
+                    </div>
+                    <div class="graph-param-row">
+                      <label class="graph-param-lbl">Seed</label>
+                      <input id="part-seed" class="graph-param-input" type="number" value="42">
+                    </div>
+                  </div>
+                  <button id="part-run-btn" class="graph-run-btn-float">RUN</button>
+                  <!-- Rotation badge -->
+                  <div class="graph-rotation-badge" id="graph-rotation-badge">0.0 deg</div>
+                  <canvas id="part-canvas"></canvas>
+                  <div id="part-tooltip"></div>
                 </div>
               </div>
-              <div id="part-terminal-output" class="terminal-output"></div>
-            </div>
 
+              <div id="part-legend" class="part-legend" style="display:none;"></div>
+
+
+
+              <!-- Resizable Divider for Logs -->
+              <div class="resize-handle-v" id="resize-logs"></div>
+
+              <!-- Logs section with R1/R2 tabs -->
+              <div class="part-terminal-wrap" id="part-logs-section">
+                <div class="terminal-tabs-row">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span id="title-toggle-logs" class="section-title-btn" title="Click to collapse/expand"
+                      style="font-size:0.6rem; font-weight:var(--fw-bold); color:var(--text-secondary); letter-spacing:0.08em; text-transform:uppercase;">CPP
+                      Explorer Logs</span>
+                    <div class="terminal-tabs">
+                      <button class="terminal-tab active" id="log-tab-robot1" data-log-robot="robot1">Robot 1</button>
+                      <button class="terminal-tab" id="log-tab-robot2" data-log-robot="robot2">Robot 2</button>
+                    </div>
+                  </div>
+                  <div class="terminal-actions">
+                    <button id="btn-stop-node" class="btn-thin btn-thin-danger" style="display:none;">Stop Node</button>
+                    <button id="btn-clear-logs" class="btn-thin">Clear</button>
+                  </div>
+                </div>
+                <div id="part-terminal-output" class="terminal-output"></div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Resizable Divider -->
+      <div class="resize-handle" id="resize-handle"></div>
+
+      <!-- Right Panel (Maps) -->
+      <div class="right-panel">
+
+        <div class="map-big">
+          <div class="panel-header" id="map-big-header">Merged Global Map</div>
+          <div class="map-rotation-badge" id="map-rotation-badge">0.0 deg</div>
+          <div class="map-container">
+            <canvas id="map-big-canvas"></canvas>
+          </div>
+        </div>
+
+        <div class="map-thumbs">
+          <div class="map-thumb" data-map="robot1">
+            <div class="panel-header">Robot 1</div>
+            <canvas id="map-thumb-robot1"></canvas>
+          </div>
+          <div class="map-thumb" data-map="robot2">
+            <div class="panel-header">Robot 2</div>
+            <canvas id="map-thumb-robot2"></canvas>
+          </div>
+          <div class="map-thumb active" data-map="merged">
+            <div class="panel-header">Merged</div>
+            <canvas id="map-thumb-merged"></canvas>
           </div>
         </div>
 
       </div>
-    </div>
-
-    <!-- Resizable Divider -->
-    <div class="resize-handle" id="resize-handle"></div>
-
-    <!-- Right Panel (Maps) -->
-    <div class="right-panel">
-
-      <div class="map-big">
-        <div class="panel-header" id="map-big-header">Merged Global Map</div>
-        <div class="map-rotation-badge" id="map-rotation-badge">0.0 deg</div>
-        <div class="map-container">
-          <canvas id="map-big-canvas"></canvas>
-        </div>
-      </div>
-
-      <div class="map-thumbs">
-        <div class="map-thumb" data-map="robot1">
-          <div class="panel-header">Robot 1</div>
-          <canvas id="map-thumb-robot1"></canvas>
-        </div>
-        <div class="map-thumb" data-map="robot2">
-          <div class="panel-header">Robot 2</div>
-          <canvas id="map-thumb-robot2"></canvas>
-        </div>
-        <div class="map-thumb active" data-map="merged">
-          <div class="panel-header">Merged</div>
-          <canvas id="map-thumb-merged"></canvas>
-        </div>
-      </div>
 
     </div>
 
   </div>
 
-</div>
-
-<!-- Unified Enlarge Modal -->
-<div class="modal-overlay hidden" id="enlarge-modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <div class="modal-tabs">
-        <button class="modal-tab active" data-target="modal-graph">Graph</button>
-        <button class="modal-tab" data-target="modal-yaml">YAML</button>
+  <!-- Unified Enlarge Modal -->
+  <div class="modal-overlay hidden" id="enlarge-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-target="modal-graph">Graph</button>
+          <button class="modal-tab" data-target="modal-yaml">YAML</button>
+        </div>
+        <button id="modal-close" class="btn-thin">Close</button>
       </div>
-      <button id="modal-close" class="btn-thin">Close</button>
-    </div>
-    <div class="modal-body">
-      <!-- Graph Pane: The main canvas wrap will be moved here -->
-      <div id="modal-graph" class="modal-pane active">
-      </div>
-      <!-- YAML Pane: Copy of the YAML editor -->
-      <div id="modal-yaml" class="modal-pane">
-        <textarea id="modal-yaml-text" spellcheck="false" readonly></textarea>
+      <div class="modal-body">
+        <!-- Graph Pane: The main canvas wrap will be moved here -->
+        <div id="modal-graph" class="modal-pane active">
+        </div>
+        <!-- YAML Pane: Copy of the YAML editor -->
+        <div id="modal-yaml" class="modal-pane">
+          <textarea id="modal-yaml-text" spellcheck="false" readonly></textarea>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<script src="lib/roslib.min.js"></script>
-<script type="module" src="js/app.js"></script>
+  <!-- Info Modal -->
+  <div class="info-overlay hidden" id="info-modal">
+    <div class="info-dialog">
+      <div class="info-dialog-header">
+        <span class="info-dialog-title">About AC-SLAM</span>
+        <button class="btn-thin" id="info-close">Close</button>
+      </div>
+      <div class="info-dialog-body">
+        <div class="info-logo-row">
+          <img src="images/acslam_logo.png" alt="Logo" width="36" height="36" class="custom-logo" />
+          <div>
+            <div class="info-app-name">AC-SLAM Mission Control</div>
+            <div class="info-version">v1.0 &middot; 2026</div>
+          </div>
+        </div>
+        <div class="info-divider"></div>
+        <h3 class="info-thesis-title">Multi-Agent Mobile Robot System for Active Collaborative SLAM Application</h3>
+        <p class="info-body">
+          This platform was developed as part of an Engineering Thesis by
+          <strong>Ferroukhi Khaled</strong> and <strong>Meddas Aymen</strong>,
+          presented in 2026 at the <em>&Eacute;cole Nationale Polytechnique</em> (ENP), Algiers.
+        </p>
+        <p class="info-body">
+          The system enables real-time teleoperation and coordinated exploration of multiple autonomous mobile robots
+          performing simultaneous localization and mapping (SLAM). It provides an integrated mission control interface
+          for map visualization, graph-based environment partitioning, and multi-robot task deployment.
+        </p>
+        <div class="info-divider"></div>
+        <div class="info-footer">
+          <span>&Eacute;cole Nationale Polytechnique &middot; Department of Electronics</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Splash Screen -->
+  <div class="splash-screen" id="splash-screen">
+    <div class="splash-content">
+      <div class="splash-map-grid">
+        <div class="splash-grid-inner" id="splash-grid"></div>
+        <div class="splash-scanline"></div>
+      </div>
+      <div class="splash-brand">
+        <img src="images/acslam_logo.png" alt="AC-SLAM" width="52" height="52" class="splash-logo custom-logo" />
+        <div class="splash-title">AC-<span class="splash-title-accent">SLAM</span></div>
+        <div class="splash-subtitle">Mission Control</div>
+      </div>
+      <div class="splash-bar-wrap">
+        <div class="splash-bar" id="splash-bar"></div>
+      </div>
+      <div class="splash-status" id="splash-status">Initializing systems&hellip;</div>
+    </div>
+  </div>
+
+  <!-- Connection Popup (shown after splash) -->
+  <div class="connect-popup-overlay hidden" id="connect-popup">
+    <div class="connect-popup">
+      <div class="connect-popup-header">
+        <img src="images/acslam_logo.png" alt="Logo" width="24" height="24" class="custom-logo" />
+        <span class="connect-popup-title">Connect to ROS Bridge</span>
+      </div>
+      <p class="connect-popup-desc">Enter the WebSocket URL of your ROS bridge server to begin.</p>
+      <div class="connect-popup-form">
+        <input type="text" id="popup-ros-url" class="conn-input connect-popup-input" value="ws://localhost:9090" />
+        <button id="popup-connect-btn" class="btn btn-primary">Connect</button>
+      </div>
+      <button class="connect-popup-skip" id="popup-skip">Skip for now</button>
+    </div>
+  </div>
+
+  <script src="lib/roslib.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+  <script>
+    // Info modal logic
+    document.getElementById('btn-info').addEventListener('click', () => {
+      document.getElementById('info-modal').classList.remove('hidden');
+    });
+    document.getElementById('info-close').addEventListener('click', () => {
+      document.getElementById('info-modal').classList.add('hidden');
+    });
+    document.getElementById('info-modal').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) document.getElementById('info-modal').classList.add('hidden');
+    });
+
+    // Connection popup logic
+    document.getElementById('popup-connect-btn').addEventListener('click', () => {
+      const url = document.getElementById('popup-ros-url').value.trim();
+      // Sync to the main input
+      document.getElementById('input-ros-url').value = url;
+      document.getElementById('connect-popup').classList.add('hidden');
+      // Trigger the main connect button
+      document.getElementById('btn-connect').click();
+    });
+    document.getElementById('popup-skip').addEventListener('click', () => {
+      document.getElementById('connect-popup').classList.add('hidden');
+    });
+    document.getElementById('popup-ros-url').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('popup-connect-btn').click();
+    });
+
+    // Loading splash animation
+    (function () {
+      const grid = document.getElementById('splash-grid');
+      const cols = 22, rows = 14;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'splash-cell';
+          // Alternate blue/orange cells randomly
+          if (Math.random() > 0.6) cell.classList.add('splash-cell-orange');
+          cell.style.animationDelay = (Math.random() * 2.5).toFixed(2) + 's';
+          grid.appendChild(cell);
+        }
+      }
+      grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+      grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+
+      const bar = document.getElementById('splash-bar');
+      const status = document.getElementById('splash-status');
+      const messages = [
+        'Initializing systems\u2026',
+        'Loading map renderer\u2026',
+        'Connecting subsystems\u2026',
+        'Calibrating sensors\u2026',
+        'Preparing interface\u2026',
+        'Ready.'
+      ];
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 18 + 5;
+        if (progress >= 100) progress = 100;
+        bar.style.width = progress + '%';
+        const msgIdx = Math.min(Math.floor(progress / 20), messages.length - 1);
+        status.textContent = messages[msgIdx];
+        if (progress >= 100) {
+          clearInterval(interval);
+          setTimeout(() => {
+            document.getElementById('splash-screen').classList.add('splash-fade');
+            setTimeout(() => {
+              document.getElementById('splash-screen').style.display = 'none';
+              // Show connection popup
+              document.getElementById('connect-popup').classList.remove('hidden');
+              setTimeout(() => document.getElementById('popup-ros-url').focus(), 100);
+            }, 600);
+          }, 400);
+        }
+      }, 350);
+    })();
+  </script>
 </body>
+
 </html>
