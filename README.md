@@ -28,8 +28,8 @@ This repository serves as the **control interface** for robots running in:
 
 | Environment | Repository |
 |:---|:---|
-| **Simulation** (Gazebo) | [multi-agent-system-AC-SLAM](https://github.com/Aymen-Jocef/multi-agent-system-AC-SLAM) |
-| **Real World** (Physical Robots) | [Real-AC-SLAM](https://github.com/Aymen-Jocef/Real-AC-SLAM) |
+| **Simulation** | [Sim-AC-SLAM](https://github.com/Aymen-Jocef/Sim-AC-SLAM) |
+| **Real World** | [Real-AC-SLAM](https://github.com/Aymen-Jocef/Real-AC-SLAM) |
 
 > [!NOTE]
 > This platform was tested with **ROS 2 Humble Hawksbill** on Ubuntu 22.04. Compatibility with other ROS 2 distributions has not been verified.
