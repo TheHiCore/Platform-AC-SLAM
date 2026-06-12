@@ -293,7 +293,7 @@ acslam_platform/
 
 | Repository | Description |
 |:---|:---|
-| [multi-agent-system-AC-SLAM](https://github.com/Aymen-Jocef/multi-agent-system-AC-SLAM) | Simulation environment (Gazebo) for multi-agent AC-SLAM |
+| [Sim-AC-SLAM](https://github.com/Aymen-Jocef/Sim-AC-SLAM)  | Simulation environment for multi-agent AC-SLAM |
 | [Real-AC-SLAM](https://github.com/Aymen-Jocef/Real-AC-SLAM) | Real-world implementation with physical robots |
 
 ---
