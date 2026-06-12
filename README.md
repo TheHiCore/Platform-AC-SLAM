@@ -110,66 +110,6 @@ This repository serves as the **control interface** for robots running in:
 
 ---
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Browser (Frontend)                    │
-│  ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌────────┐ │
-│  │ Teleop   │  │ Map View  │  │Partition │  │  Logs  │ │
-│  │  Module  │  │  Module   │  │  Module  │  │ Module │ │
-│  └────┬─────┘  └─────┬─────┘  └────┬─────┘  └───┬────┘ │
-│       │              │             │             │      │
-│       └──────────────┴─────────────┴─────────────┘      │
-│                        │ WebSocket                       │
-└────────────────────────┼────────────────────────────────┘
-                         │
-          ┌──────────────┴──────────────┐
-          │                             │
-   ┌──────▼──────┐              ┌───────▼──────┐
-   │  rosbridge  │              │  server.py   │
-   │  (ws:9090)  │              │  (http:8000) │
-   └──────┬──────┘              └───────┬──────┘
-          │                             │
-   ┌──────▼──────────────────────────────▼─────┐
-   │              ROS 2 Humble                  │
-   │  ┌────────┐  ┌────────┐  ┌─────────────┐  │
-   │  │Robot 1 │  │Robot 2 │  │ cpp_explorer │  │
-   │  │ /cmd_vel│  │ /cmd_vel│  │   nodes     │  │
-   │  │ /map   │  │ /map   │  │             │  │
-   │  └────────┘  └────────┘  └─────────────┘  │
-   └────────────────────────────────────────────┘
-```
-
----
-
-## Project Structure
-
-```
-acslam_platform/
-├── index.html              # Main application entry point
-├── server.py               # Python backend (HTTP + SSE log streaming)
-├── package.json            # Node.js project config (Vite dev server)
-├── css/
-│   └── main.css            # Complete application stylesheet
-├── js/
-│   ├── app.js              # Application bootstrap & module orchestration
-│   ├── connection.js       # ROS WebSocket connection manager
-│   ├── teleop.js           # Teleoperation controls & keyboard bindings
-│   ├── map_viewer.js       # Occupancy grid map rendering engine
-│   └── partitioner.js      # Graph partitioning & deployment logic
-├── lib/
-│   └── roslib.min.js       # roslibjs — ROS JavaScript client library
-├── images/
-│   ├── acslam_logo.png     # Application logo
-│   ├── robot1.png          # Robot 1 reference image
-│   └── robot2.png          # Robot 2 reference image
-├── yaml/                   # Auto-generated YAML files for deployed graphs
-└── config/                 # Configuration files
-```
-
----
-
 ## Prerequisites
 
 Before running the platform, ensure you have the following installed:
@@ -295,6 +235,34 @@ npm install
 
 > [!WARNING]
 > This platform has been tested and validated exclusively on **ROS 2 Humble**. Other ROS 2 distributions (Iron, Jazzy, etc.) may work but are untested.
+
+---
+
+
+## Project Structure
+
+```
+acslam_platform/
+├── index.html              # Main application entry point
+├── server.py               # Python backend (HTTP + SSE log streaming)
+├── package.json            # Node.js project config (Vite dev server)
+├── css/
+│   └── main.css            # Complete application stylesheet
+├── js/
+│   ├── app.js              # Application bootstrap & module orchestration
+│   ├── connection.js       # ROS WebSocket connection manager
+│   ├── teleop.js           # Teleoperation controls & keyboard bindings
+│   ├── map_viewer.js       # Occupancy grid map rendering engine
+│   └── partitioner.js      # Graph partitioning & deployment logic
+├── lib/
+│   └── roslib.min.js       # roslibjs — ROS JavaScript client library
+├── images/
+│   ├── acslam_logo.png     # Application logo
+│   ├── robot1.png          # Robot 1 reference image
+│   └── robot2.png          # Robot 2 reference image
+├── yaml/                   # Auto-generated YAML files for deployed graphs
+└── config/                 # Configuration files
+```
 
 ---
 
